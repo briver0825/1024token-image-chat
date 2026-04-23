@@ -33,6 +33,7 @@ import {
   createDownloadFileName,
 } from "@/lib/image-chat/utils";
 import { isTaskInProgress } from "@/lib/image-chat/task-polling";
+import { createUuid } from "@/lib/shared/uuid";
 
 const ACTIVE_CONVERSATION_STORAGE_KEY = "image-chat.active-conversation-id";
 const GENERATION_SETTINGS_STORAGE_KEY = "image-chat.generation-settings";
@@ -426,7 +427,7 @@ export function useImageChat() {
         );
         const contentHash = await computeBlobSha256(blob);
         const existingAsset = await repository.getAssetByHash(contentHash);
-        const assetId = existingAsset?.id ?? crypto.randomUUID();
+        const assetId = existingAsset?.id ?? createUuid();
         const resolvedSettings = extractGenerationSettings(taskStatus.params);
 
         await repository.upsertConversation({
@@ -870,13 +871,13 @@ export function useImageChat() {
       setIsSubmitting(true);
 
       const now = new Date().toISOString();
-      const conversationId = activeConversationId ?? crypto.randomUUID();
+      const conversationId = activeConversationId ?? createUuid();
       const existingConversation = activeConversation?.conversation;
       const conversationCreatedAt = existingConversation?.createdAt ?? now;
       const conversationTitle =
         existingConversation?.title ?? buildConversationTitle(normalizedPrompt);
-      const userMessageId = crypto.randomUUID();
-      const assistantMessageId = crypto.randomUUID();
+      const userMessageId = createUuid();
+      const assistantMessageId = createUuid();
       const referenceImage = referenceAsset
         ? {
             b64: await blobToBase64(referenceAsset.blob),

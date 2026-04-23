@@ -6,6 +6,7 @@ import type {
   ImageGenerationResult,
   ProviderConnectionConfig,
 } from "@/lib/image-chat/types";
+import { createUuid } from "@/lib/shared/uuid";
 import {
   buildImageEditEndpoint,
   buildImageGenerationEndpoint,
@@ -130,7 +131,7 @@ export function createImageGenerationTask({
 }): GenerateTaskCreateResponse {
   pruneExpiredTasks();
 
-  const taskId = crypto.randomUUID();
+  const taskId = createUuid();
   const createdAt = new Date().toISOString();
 
   getTaskStore().set(taskId, {
