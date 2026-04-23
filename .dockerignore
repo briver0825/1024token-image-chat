@@ -1,0 +1,16 @@
+.git
+.gitignore
+.next
+node_modules
+coverage
+dist
+build
+out
+.DS_Store
+*.log
+*.pem
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
