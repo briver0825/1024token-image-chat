@@ -57,6 +57,10 @@ pnpm dev
 
 并且已启用 Next.js `standalone` 输出，适合直接容器化部署。
 
+当前 Docker 基础镜像使用：
+
+- **Node.js 24 Alpine**
+
 ### 1. 生成生产环境 RSA 私钥
 
 生产环境必须提供 `IMAGE_CHAT_CONFIG_PRIVATE_KEY`，否则服务端无法给前端下发加密公钥。
@@ -172,4 +176,3 @@ pnpm build
 - Tailwind CSS 4
 - IndexedDB (`idb`)
 - yet-another-react-lightbox
-
