@@ -36,7 +36,7 @@ export function ConversationListItem({
   return (
     <div
       className={cn(
-        "group/row flex items-start gap-0.5 rounded-lg border p-0.5 transition-colors",
+        "group/row flex w-full min-w-0 items-start gap-0.5 overflow-hidden rounded-lg border p-0.5 transition-colors",
         active
           ? "border-primary/35 bg-primary/8"
           : "border-transparent hover:border-border/70 hover:bg-accent/30"
@@ -47,7 +47,7 @@ export function ConversationListItem({
         variant="ghost"
         aria-label={conversation.title}
         className={cn(
-          "h-auto min-w-0 flex-1 justify-start rounded-md px-2 py-1.5 text-left",
+          "h-auto min-w-0 flex-1 justify-start overflow-hidden rounded-md px-2 py-1.5 text-left",
           active
             ? "bg-transparent text-foreground hover:bg-transparent"
             : "bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
@@ -55,11 +55,11 @@ export function ConversationListItem({
         onClick={() => onSelect(conversation.id)}
         aria-pressed={active}
       >
-        <div className="flex min-w-0 flex-1 items-start gap-2">
-          <div className="mt-0.5 rounded-md bg-primary/12 p-1 text-primary">
+        <div className="flex min-w-0 flex-1 items-start gap-2 overflow-hidden">
+          <div className="mt-0.5 shrink-0 rounded-md bg-primary/12 p-1 text-primary">
             <MessageSquareTextIcon className="size-3" />
           </div>
-          <div className="min-w-0 flex-1 space-y-1">
+          <div className="w-0 min-w-0 flex-1 space-y-1">
             <div className="min-w-0 flex items-start gap-1.5">
               <div
                 title={conversation.title}

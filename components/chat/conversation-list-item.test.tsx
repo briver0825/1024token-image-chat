@@ -57,6 +57,33 @@ describe("ConversationListItem", () => {
     expect(screen.getByText(longTitle)).toHaveClass("overflow-hidden");
   });
 
+  it("allows the selectable row to shrink inside the sidebar instead of overflowing", () => {
+    const longTitle =
+      "一张模糊、高颗粒的快照，在东京地铁铁轨旁边的电影感画面";
+
+    render(
+      <ConversationListItem
+        conversation={{
+          id: "conv-sidebar-overflow",
+          title: longTitle,
+          updatedAt: "2026-04-23T12:00:00.000Z",
+          createdAt: "2026-04-23T11:00:00.000Z",
+          messageCount: 22,
+        }}
+        active
+        onSelect={vi.fn()}
+        onTogglePinned={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    );
+
+    const selectButton = screen.getByRole("button", { name: longTitle });
+
+    expect(selectButton).toHaveClass("min-w-0");
+    expect(selectButton).toHaveClass("overflow-hidden");
+    expect(selectButton).not.toHaveClass("shrink-0");
+  });
+
   it("supports deleting a conversation without triggering selection", async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();
