@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
+  createMarketItem,
   createImageGenerationTask,
   fetchImageChatPublicKey,
   fetchImageGenerationTaskStatus,
@@ -1301,6 +1302,48 @@ export function useImageChat() {
     [activeAssistantMessages, submitPrompt]
   );
 
+  const publishMessageToMarket = useCallback(
+    async (messageId: string) => {
+      const message = activeAssistantMessages.find(
+        (candidate) => candidate.id === messageId
+      );
+
+      if (!message?.assetId) {
+        toast.error("这张图片暂时无法提交到焚决市场。");
+        return;
+      }
+
+      const asset = activeConversation?.assets.find(
+        (candidate) => candidate.id === message.assetId
+      );
+
+      if (!asset) {
+        toast.error("这张图片暂时无法提交到焚决市场。");
+        return;
+      }
+
+      try {
+        await createMarketItem({
+          prompt: message.prompt,
+          settings: message.settings,
+          model: connectionConfig.model,
+          image: asset.blob,
+          width: asset.width,
+          height: asset.height,
+        });
+        toast.success("已提交到焚决市场");
+      } catch (error) {
+        const message =
+          error instanceof ImageGenerationRequestError
+            ? error.message
+            : "提交焚决市场失败，请稍后再试。";
+
+        toast.error(message);
+      }
+    },
+    [activeAssistantMessages, activeConversation?.assets, connectionConfig.model]
+  );
+
   const hasConnectionConfig = useMemo(
     () =>
       connectionConfig.apiKey.trim().length > 0 &&
@@ -1339,6 +1382,7 @@ export function useImageChat() {
     copyPrompt,
     downloadImage,
     regenerateMessage,
+    publishMessageToMarket,
     useReferenceImage,
   };
 }

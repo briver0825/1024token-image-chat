@@ -1,10 +1,35 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { ChatComposer } from "@/components/chat/chat-composer";
 
 describe("ChatComposer", () => {
+  it("loads a market draft prompt and submits the edited prompt", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        draftPrompt="来自焚决市场的提示词"
+        draftPromptKey="market-item-1"
+        onSubmit={onSubmit}
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText("描述你想生成的画面...");
+
+    await waitFor(() => {
+      expect(promptInput).toHaveValue("来自焚决市场的提示词");
+    });
+
+    await user.type(promptInput, "，增加电影感");
+    await user.click(screen.getByRole("button", { name: "发送生成" }));
+
+    expect(onSubmit).toHaveBeenCalledWith("来自焚决市场的提示词，增加电影感");
+  });
+
   it("renders selected reference images and allows removing or clearing them", async () => {
     const user = userEvent.setup();
     const onRemoveReference = vi.fn();

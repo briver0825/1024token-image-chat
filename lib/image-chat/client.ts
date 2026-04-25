@@ -1,9 +1,11 @@
 import type {
+  CreateMarketItemResponse,
   EncryptedConnectionPayload,
   GenerateErrorResponse,
   GenerateTaskRequest,
   GenerateTaskCreateResponse,
   GenerateTaskStatusResponse,
+  GenerationSettings,
   ProviderConnectionConfig,
   PublicKeyResponse,
 } from "@/lib/image-chat/types";
@@ -204,4 +206,46 @@ export async function fetchImageGenerationTaskStatus(
   }
 
   return body as GenerateTaskStatusResponse;
+}
+
+export async function createMarketItem(payload: {
+  prompt: string;
+  settings: GenerationSettings;
+  model?: string;
+  image: Blob;
+  width: number;
+  height: number;
+}): Promise<CreateMarketItemResponse> {
+  const formData = new FormData();
+
+  formData.set("prompt", payload.prompt);
+  formData.set("settings", JSON.stringify(payload.settings));
+  formData.set("width", String(payload.width));
+  formData.set("height", String(payload.height));
+
+  if (payload.model?.trim()) {
+    formData.set("model", payload.model.trim());
+  }
+
+  formData.set("image", payload.image, "image-chat-market-image");
+
+  const response = await fetch("/api/image-chat/market", {
+    method: "POST",
+    body: formData,
+  });
+  const body = (await response.json()) as
+    | CreateMarketItemResponse
+    | GenerateErrorResponse;
+
+  if (!response.ok) {
+    const errorBody = body as GenerateErrorResponse;
+
+    throw new ImageGenerationRequestError(
+      errorBody.error?.message ?? "提交焚决市场失败，请稍后再试。",
+      response.status,
+      errorBody.error?.code
+    );
+  }
+
+  return body as CreateMarketItemResponse;
 }

@@ -15,6 +15,7 @@ import {
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MIN_PROVIDER_TIMEOUT_MS = 1_000;
+const MAX_PROVIDER_ERROR_MESSAGE_LENGTH = 800;
 
 const referenceImageSchema = z.object({
   b64: z.string().transform((value) => value.trim()),
@@ -95,19 +96,83 @@ export class ProviderHttpError extends Error {
     public readonly body?: unknown
   ) {
     const providerMessage =
-      typeof body === "object" &&
-      body &&
-      "error" in body &&
-      typeof body.error === "object" &&
-      body.error &&
-      "message" in body.error &&
-      typeof body.error.message === "string"
-        ? body.error.message
-        : `Provider request failed with status ${status}`;
+      extractProviderErrorMessage(body) ??
+      `Provider request failed with status ${status}`;
 
     super(providerMessage);
     this.name = "ProviderHttpError";
   }
+}
+
+function compactErrorMessage(message: string) {
+  const normalized = message.replace(/\s+/g, " ").trim();
+
+  if (normalized.length <= MAX_PROVIDER_ERROR_MESSAGE_LENGTH) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, MAX_PROVIDER_ERROR_MESSAGE_LENGTH)}…`;
+}
+
+function extractStringField(
+  body: Record<string, unknown>,
+  fieldName: string
+) {
+  const value = body[fieldName];
+
+  return typeof value === "string" ? compactErrorMessage(value) : null;
+}
+
+function extractProviderErrorMessage(body: unknown): string | null {
+  if (typeof body === "string") {
+    const message = compactErrorMessage(body);
+
+    return message || null;
+  }
+
+  if (!body || typeof body !== "object") {
+    return null;
+  }
+
+  const record = body as Record<string, unknown>;
+  const directMessage =
+    extractStringField(record, "message") ??
+    extractStringField(record, "detail") ??
+    extractStringField(record, "error_description");
+
+  if (directMessage) {
+    return directMessage;
+  }
+
+  const errorValue = record.error;
+
+  if (typeof errorValue === "string") {
+    const message = compactErrorMessage(errorValue);
+
+    return message || null;
+  }
+
+  if (errorValue && typeof errorValue === "object") {
+    const errorRecord = errorValue as Record<string, unknown>;
+
+    return (
+      extractStringField(errorRecord, "message") ??
+      extractStringField(errorRecord, "detail") ??
+      extractStringField(errorRecord, "code")
+    );
+  }
+
+  return null;
+}
+
+function createProviderUnavailableMessage(reason?: string) {
+  const normalizedReason = reason ? compactErrorMessage(reason) : "";
+
+  if (!normalizedReason) {
+    return "图片服务暂时不可用，请稍后重试。";
+  }
+
+  return `图片服务暂时不可用：${normalizedReason}`;
 }
 
 export function parseGenerateRequest(input: unknown): GenerateTaskRequest {
@@ -275,7 +340,9 @@ export async function normalizeProviderError(error: unknown): Promise<{
         status: error.status,
         error: {
           code: "unauthorized",
-          message: "上游鉴权失败，请检查 API Key 或 Base URL。",
+          message: error.message
+            ? `上游鉴权失败：${error.message}`
+            : "上游鉴权失败，请检查 API Key 或 Base URL。",
         },
       };
     }
@@ -285,7 +352,9 @@ export async function normalizeProviderError(error: unknown): Promise<{
         status: 429,
         error: {
           code: "rate_limited",
-          message: "图片生成过于频繁，请稍后再试。",
+          message: error.message
+            ? `图片生成过于频繁：${error.message}`
+            : "图片生成过于频繁，请稍后再试。",
         },
       };
     }
@@ -299,6 +368,14 @@ export async function normalizeProviderError(error: unknown): Promise<{
         },
       };
     }
+
+    return {
+      status: 502,
+      error: {
+        code: "provider_unavailable",
+        message: createProviderUnavailableMessage(error.message),
+      },
+    };
   }
 
   if (
@@ -318,7 +395,9 @@ export async function normalizeProviderError(error: unknown): Promise<{
     status: 502,
     error: {
       code: "provider_unavailable",
-      message: "图片服务暂时不可用，请稍后重试。",
+      message: createProviderUnavailableMessage(
+        error instanceof Error ? error.message : undefined
+      ),
     },
   };
 }
@@ -438,7 +517,30 @@ export function buildProviderRequestInit(
 
 export async function parseProviderResponse(response: Response) {
   const text = await response.text();
-  const body = text ? JSON.parse(text) : {};
+  let body: unknown = {};
+
+  if (text) {
+    try {
+      body = JSON.parse(text) as unknown;
+    } catch (error) {
+      if (!response.ok) {
+        body = {
+          error: {
+            message: text,
+          },
+        };
+      } else {
+        throw new ProviderHttpError(502, {
+          error: {
+            message:
+              error instanceof Error
+                ? `Provider response was not valid JSON: ${error.message}`
+                : "Provider response was not valid JSON.",
+          },
+        });
+      }
+    }
+  }
 
   if (!response.ok) {
     throw new ProviderHttpError(response.status, body);

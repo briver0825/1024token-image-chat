@@ -106,7 +106,7 @@ describe("image-task-manager", () => {
         status: "failed",
         error: {
           code: "rate_limited",
-          message: "图片生成过于频繁，请稍后再试。",
+          message: "图片生成过于频繁：Too many requests",
         },
       });
     });

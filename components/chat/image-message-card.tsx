@@ -6,6 +6,7 @@ import { useState } from "react";
 import {
   CopyIcon,
   DownloadIcon,
+  FlameIcon,
   ImagePlusIcon,
   Loader2Icon,
   Maximize2Icon,
@@ -55,6 +56,7 @@ type ImageMessageCardProps = {
   onDownload: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onUseAsReference: (messageId: string) => void;
+  onPublishToMarket?: (messageId: string) => void;
 };
 
 function ImageActionButtons({
@@ -63,12 +65,14 @@ function ImageActionButtons({
   onDownload,
   onRegenerate,
   onUseAsReference,
+  onPublishToMarket,
 }: {
   messageId: string;
   onCopyPrompt: (messageId: string) => void;
   onDownload: (messageId: string) => void;
   onRegenerate: (messageId: string) => void;
   onUseAsReference: (messageId: string) => void;
+  onPublishToMarket?: (messageId: string) => void;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -99,6 +103,17 @@ function ImageActionButtons({
         <ImagePlusIcon className="size-4" />
         设为参考图
       </Button>
+      {onPublishToMarket ? (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onPublishToMarket(messageId)}
+        >
+          <FlameIcon className="size-4" />
+          提交市场
+        </Button>
+      ) : null}
       <Button
         type="button"
         variant="outline"
@@ -175,6 +190,7 @@ export function ImageMessageCard({
   onDownload,
   onRegenerate,
   onUseAsReference,
+  onPublishToMarket,
 }: ImageMessageCardProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const referenceImages =
@@ -290,6 +306,7 @@ export function ImageMessageCard({
               onDownload={onDownload}
               onRegenerate={onRegenerate}
               onUseAsReference={onUseAsReference}
+              onPublishToMarket={onPublishToMarket}
             />
           </div>
 

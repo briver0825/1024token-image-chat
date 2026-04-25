@@ -10,6 +10,12 @@ services:
       NODE_ENV: production
       HOSTNAME: 0.0.0.0
       PORT: 3000
+      IMAGE_CHAT_MARKET_DATA_DIR: /app/data/image-chat-market
     ports:
       - "3000:3000"
+    volumes:
+      - image-chat-data:/app/data
     restart: unless-stopped
+
+volumes:
+  image-chat-data:

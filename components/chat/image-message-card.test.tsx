@@ -24,6 +24,7 @@ describe("ImageMessageCard", () => {
     const onDownload = vi.fn();
     const onRegenerate = vi.fn();
     const onUseAsReference = vi.fn();
+    const onPublishToMarket = vi.fn();
 
     render(
       <ImageMessageCard
@@ -43,6 +44,7 @@ describe("ImageMessageCard", () => {
         onDownload={onDownload}
         onRegenerate={onRegenerate}
         onUseAsReference={onUseAsReference}
+        onPublishToMarket={onPublishToMarket}
       />
     );
 
@@ -51,11 +53,13 @@ describe("ImageMessageCard", () => {
     await user.click(screen.getByRole("button", { name: "复制提示词" }));
     await user.click(screen.getByRole("button", { name: "下载图片" }));
     await user.click(screen.getByRole("button", { name: "设为参考图" }));
+    await user.click(screen.getByRole("button", { name: "提交市场" }));
     await user.click(screen.getByRole("button", { name: "重新生成" }));
 
     expect(onCopyPrompt).toHaveBeenCalledWith("assistant-1");
     expect(onDownload).toHaveBeenCalledWith("assistant-1");
     expect(onUseAsReference).toHaveBeenCalledWith("assistant-1");
+    expect(onPublishToMarket).toHaveBeenCalledWith("assistant-1");
     expect(onRegenerate).toHaveBeenCalledWith("assistant-1");
   });
 

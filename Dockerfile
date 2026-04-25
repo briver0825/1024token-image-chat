@@ -30,7 +30,10 @@ ENV PORT=3000
 
 WORKDIR /app
 
-RUN addgroup -S nodejs && adduser -S nextjs -G nodejs
+RUN addgroup -S nodejs \
+  && adduser -S nextjs -G nodejs \
+  && mkdir -p /app/data \
+  && chown -R nextjs:nodejs /app/data
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

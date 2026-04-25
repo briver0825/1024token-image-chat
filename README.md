@@ -7,6 +7,7 @@
 - 前端加密、后端解密调用上游图片接口
 - 本地会话历史与图片库
 - 参考图续画
+- 公共「焚决市场」：提交生成结果，浏览公开提示词与效果图，并带回聊天区再生成
 
 > 这个项目默认**不在服务端保存用户的上游 API Key**。服务端只需要一把 RSA 私钥，用来解密前端临时加密后的调用配置。
 
@@ -135,6 +136,7 @@ docker run -d \
   --name image-chat \
   -p 3000:3000 \
   --env-file .env \
+  -v image-chat-data:/app/data \
   image-chat:latest
 ```
 
@@ -148,6 +150,23 @@ docker run -d \
 | --- | --- | --- |
 | `IMAGE_CHAT_CONFIG_PRIVATE_KEY` | 是（生产） | 服务端 RSA 私钥，用于解密前端加密后的调用配置 |
 | `IMAGE_CHAT_PROVIDER_TIMEOUT_MS` | 否 | 上游图片接口超时时间，默认 `180000` 毫秒 |
+| `IMAGE_CHAT_MARKET_DATA_DIR` | 否 | 焚决市场 SQLite 与图片文件目录，Docker 默认 `/app/data/image-chat-market` |
+| `IMAGE_CHAT_MARKET_MAX_IMAGE_BYTES` | 否 | 焚决市场单张图片大小上限，默认 `10485760` 字节 |
+| `IMAGE_CHAT_MARKET_ADMIN_TOKEN` | 否 | 焚决市场管理员删除口令；设置后可在市场页软删除作品 |
+
+### 焚决市场数据持久化
+
+Docker Compose 默认把命名卷 `image-chat-data` 挂载到 `/app/data`，市场元数据和图片会保存在该卷中。  
+如果你使用纯 Docker 命令部署，建议额外挂载数据目录：
+
+```bash
+docker run -d \
+  --name image-chat \
+  -p 3000:3000 \
+  --env-file .env \
+  -v image-chat-data:/app/data \
+  image-chat:latest
+```
 
 ### 端口
 

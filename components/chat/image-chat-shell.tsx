@@ -1,8 +1,16 @@
 "use client";
 
-import { useMemo, useState, type CSSProperties } from "react";
+import Link from "next/link";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 
 import {
+  FlameIcon,
   ImagePlusIcon,
   ImagesIcon,
   PinIcon,
@@ -47,7 +55,11 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useImageChat } from "@/hooks/use-image-chat";
 import { filterConversationsByQuery } from "@/lib/image-chat/conversation-filter";
-import type { ConversationSummaryRecord } from "@/lib/image-chat/types";
+import { MARKET_DRAFT_STORAGE_KEY } from "@/lib/image-chat/market-draft";
+import type {
+  ConversationSummaryRecord,
+  MarketDraft,
+} from "@/lib/image-chat/types";
 import { formatTimestamp } from "@/lib/image-chat/utils";
 
 function UserPromptCard({
@@ -124,6 +136,24 @@ function LoadingState() {
   );
 }
 
+function parseMarketDraft(value: string | null): MarketDraft | null {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Partial<MarketDraft>;
+
+    if (!parsed.prompt || !parsed.settings) {
+      return null;
+    }
+
+    return parsed as MarketDraft;
+  } catch {
+    return null;
+  }
+}
+
 export function ImageChatShell() {
   const {
     conversations,
@@ -153,15 +183,22 @@ export function ImageChatShell() {
     copyPrompt,
     downloadImage,
     regenerateMessage,
+    publishMessageToMarket,
     useReferenceImage,
   } = useImageChat();
   const [conversationQuery, setConversationQuery] = useState("");
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
+  const [marketDraft, setMarketDraft] = useState<{
+    key: string;
+    prompt: string;
+  } | null>(null);
   const [pendingDeleteConversation, setPendingDeleteConversation] =
     useState<ConversationSummaryRecord | null>(null);
   const [isDeletingConversation, setIsDeletingConversation] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const hasMessages = renderedMessages.length > 0;
+  const latestMessageId = renderedMessages.at(-1)?.id;
   const filteredConversations = useMemo(
     () => filterConversationsByQuery(conversations, conversationQuery),
     [conversations, conversationQuery]
@@ -170,6 +207,60 @@ export function ImageChatShell() {
     () => conversations.filter((conversation) => conversation.pinned).length,
     [conversations]
   );
+
+  useEffect(() => {
+    if (isBootstrapping || !hasMessages) {
+      return;
+    }
+
+    queueMicrotask(() => {
+      messagesEndRef.current?.scrollIntoView({
+        behavior: "auto",
+        block: "end",
+      });
+    });
+  }, [activeConversationId, hasMessages, isBootstrapping, latestMessageId]);
+
+  useEffect(() => {
+    if (isBootstrapping) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    queueMicrotask(() => {
+      void (async () => {
+        if (isCancelled) {
+          return;
+        }
+
+        const draft = parseMarketDraft(
+          window.localStorage.getItem(MARKET_DRAFT_STORAGE_KEY)
+        );
+
+        if (!draft) {
+          return;
+        }
+
+        window.localStorage.removeItem(MARKET_DRAFT_STORAGE_KEY);
+        await startNewConversation();
+
+        if (isCancelled) {
+          return;
+        }
+
+        updateSettings(draft.settings);
+        setMarketDraft({
+          key: draft.sourceMarketItemId ?? draft.createdAt,
+          prompt: draft.prompt,
+        });
+      })();
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [isBootstrapping, startNewConversation, updateSettings]);
 
   const handleRequestDeleteConversation = (conversationId: string) => {
     const targetConversation =
@@ -253,6 +344,18 @@ export function ImageChatShell() {
               </Button>
             </div>
             <div className="space-y-2">
+              <Button
+                asChild
+                type="button"
+                variant="outline"
+                size="sm"
+                className="w-full justify-start border-sidebar-border/70 bg-sidebar-accent/30 text-sidebar-foreground hover:bg-sidebar-accent"
+              >
+                <Link href="/market">
+                  <FlameIcon className="size-4 text-primary" />
+                  焚决市场
+                </Link>
+              </Button>
               <div className="relative">
                 <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-sidebar-foreground/45" />
                 <Input
@@ -337,6 +440,12 @@ export function ImageChatShell() {
                       </Badge>
                     ) : null}
                   </Button>
+                  <Button asChild variant="outline">
+                    <Link href="/market">
+                      <FlameIcon className="size-4" />
+                      焚决市场
+                    </Link>
+                  </Button>
                   <Button
                     type="button"
                     variant="outline"
@@ -401,11 +510,15 @@ export function ImageChatShell() {
                               onRegenerate={(messageId) =>
                                 void regenerateMessage(messageId)
                               }
+                              onPublishToMarket={(messageId) =>
+                                void publishMessageToMarket(messageId)
+                              }
                             />
                           </div>
                         )
                       )
                     )}
+                    <div ref={messagesEndRef} aria-hidden="true" />
                   </div>
                 </ScrollArea>
 
@@ -418,6 +531,8 @@ export function ImageChatShell() {
                       disabledHint="请先在右侧填写 API Key、Base URL 和模型，并等待公钥就绪。"
                       isSubmitting={isSubmitting}
                       referenceImages={selectedReferenceImages}
+                      draftPrompt={marketDraft?.prompt}
+                      draftPromptKey={marketDraft?.key}
                       onClearReferences={clearReferenceImage}
                       onRemoveReference={removeReferenceImage}
                       onUploadReferenceImages={addReferenceImageFiles}

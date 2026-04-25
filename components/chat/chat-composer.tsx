@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { ImagePlusIcon, Loader2Icon, SparklesIcon, XIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ type ChatComposerProps = {
   isSubmitting: boolean;
   canSubmit?: boolean;
   disabledHint?: string;
+  draftPrompt?: string;
+  draftPromptKey?: string;
   referenceImage?: ReferenceImagePreview | null;
   referenceImages?: ReferenceImagePreview[] | null;
   onClearReference?: () => void;
@@ -39,6 +41,8 @@ export function ChatComposer({
   isSubmitting,
   canSubmit = true,
   disabledHint,
+  draftPrompt,
+  draftPromptKey,
   referenceImage,
   referenceImages,
   onClearReference,
@@ -56,6 +60,24 @@ export function ChatComposer({
   const canUploadMoreReferences =
     Boolean(onUploadReferenceImages) &&
     selectedReferenceImages.length < MAX_REFERENCE_IMAGES;
+
+  useEffect(() => {
+    if (draftPrompt === undefined) {
+      return;
+    }
+
+    let isCancelled = false;
+
+    queueMicrotask(() => {
+      if (!isCancelled) {
+        setValue(draftPrompt);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [draftPrompt, draftPromptKey]);
 
   async function handleSubmit() {
     if (!normalizedValue || isSubmitting || !canSubmit) {

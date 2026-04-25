@@ -189,6 +189,49 @@ export type ImageGalleryRecord = {
   createdAt: string;
 };
 
+export type MarketItemRecord = {
+  id: string;
+  prompt: string;
+  settings: GenerationSettings;
+  model?: string;
+  imageFileName: string;
+  imageMimeType: string;
+  imageBytes: number;
+  imageWidth: number;
+  imageHeight: number;
+  imageSha256: string;
+  createdAt: string;
+  deletedAt?: string;
+};
+
+export type MarketItemResponse = {
+  id: string;
+  prompt: string;
+  settings: GenerationSettings;
+  model?: string;
+  image: {
+    url: string;
+    mimeType: string;
+    width: number;
+    height: number;
+    bytes: number;
+    sha256: string;
+  };
+  createdAt: string;
+};
+
+export type CreateMarketItemResponse = {
+  item: MarketItemResponse;
+};
+
+export type MarketDraft = {
+  prompt: string;
+  settings: GenerationSettings;
+  sourceMarketItemId?: string;
+  model?: string;
+  createdAt: string;
+};
+
 export type ConversationDetail = {
   conversation: ConversationSummaryRecord;
   messages: MessageRecord[];

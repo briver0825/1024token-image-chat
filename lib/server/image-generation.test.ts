@@ -6,6 +6,7 @@ import {
   mapProviderSuccess,
   normalizeProviderError,
   parseGenerateRequest,
+  parseProviderResponse,
   resolveProviderTimeoutMs,
   type GenerateRequest,
 } from "@/lib/server/image-generation";
@@ -115,7 +116,7 @@ describe("buildProviderRequestInit", () => {
 });
 
 describe("normalizeProviderError", () => {
-  it("maps upstream 429 responses to a stable payload", async () => {
+  it("maps upstream 429 responses and keeps the provider reason", async () => {
     const error = new ProviderHttpError(429, {
       error: {
         message: "Too many requests",
@@ -126,9 +127,51 @@ describe("normalizeProviderError", () => {
       status: 429,
       error: {
         code: "rate_limited",
-        message: "图片生成过于频繁，请稍后再试。",
+        message: "图片生成过于频繁：Too many requests",
       },
     });
+  });
+
+  it("keeps the upstream message for provider-side failures", async () => {
+    const error = new ProviderHttpError(500, {
+      error: {
+        message: "model gpt-image-x is not available for this account",
+      },
+    });
+
+    await expect(normalizeProviderError(error)).resolves.toEqual({
+      status: 502,
+      error: {
+        code: "provider_unavailable",
+        message:
+          "图片服务暂时不可用：model gpt-image-x is not available for this account",
+      },
+    });
+  });
+
+  it("keeps network error details for provider unavailable failures", async () => {
+    await expect(
+      normalizeProviderError(new TypeError("fetch failed: connect ECONNREFUSED"))
+    ).resolves.toEqual({
+      status: 502,
+      error: {
+        code: "provider_unavailable",
+        message: "图片服务暂时不可用：fetch failed: connect ECONNREFUSED",
+      },
+    });
+  });
+});
+
+describe("parseProviderResponse", () => {
+  it("uses a non-JSON upstream error body as the provider failure reason", async () => {
+    await expect(
+      parseProviderResponse(
+        new Response("upstream gateway refused the model request", {
+          status: 502,
+          statusText: "Bad Gateway",
+        })
+      )
+    ).rejects.toThrow("upstream gateway refused the model request");
   });
 });
 
