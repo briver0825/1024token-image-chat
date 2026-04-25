@@ -16,6 +16,7 @@ import {
   persistProviderConfigPreference,
 } from "@/lib/image-chat/provider-config-persistence";
 import { createImageChatRepository } from "@/lib/image-chat/repository";
+import { MAX_REFERENCE_IMAGES } from "@/lib/image-chat/types";
 import type {
   ConversationDetail,
   ConversationSummaryRecord,
@@ -56,6 +57,7 @@ export type RenderedAssistantMessage = {
   settings: GenerationSettings;
   assetId?: string;
   referenceAssetId?: string;
+  referenceAssetIds?: string[];
   errorMessage?: string;
   image?: {
     src: string;
@@ -69,6 +71,12 @@ export type RenderedAssistantMessage = {
     width: number;
     height: number;
   };
+  referenceImages?: Array<{
+    src: string;
+    mimeType: string;
+    width: number;
+    height: number;
+  }>;
 };
 
 export type RenderedChatMessage = RenderedUserMessage | RenderedAssistantMessage;
@@ -91,9 +99,11 @@ export type RenderedGalleryImage = {
 };
 
 export type ComposerReferenceImage = {
-  assetId: string;
-  messageId: string;
+  id: string;
+  assetId?: string;
+  messageId?: string;
   prompt: string;
+  blob: Blob;
   image: {
     src: string;
     mimeType: string;
@@ -139,6 +149,42 @@ function sleep(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+function normalizeReferenceAssetIds(referenceAssetIds?: string | string[]) {
+  if (!referenceAssetIds) {
+    return [];
+  }
+
+  return Array.isArray(referenceAssetIds) ? referenceAssetIds : [referenceAssetIds];
+}
+
+function getMessageReferenceAssetIds(message: Pick<MessageRecord, "referenceAssetId" | "referenceAssetIds">) {
+  return [
+    ...(message.referenceAssetIds ?? []),
+    ...(message.referenceAssetId && !message.referenceAssetIds?.includes(message.referenceAssetId)
+      ? [message.referenceAssetId]
+      : []),
+  ];
+}
+
+function isSupportedReferenceImage(file: File) {
+  return /^image\/(png|jpeg|webp)$/i.test(file.type);
+}
+
+function readImageDimensions(src: string) {
+  return new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => {
+      resolve({
+        width: image.naturalWidth || image.width,
+        height: image.naturalHeight || image.height,
+      });
+    };
+    image.onerror = () => reject(new Error("Unable to load reference image."));
+    image.src = src;
+  });
+}
+
 function extractGenerationSettings(settings: Partial<GenerationSettings> | undefined) {
   return {
     size: settings?.size ?? DEFAULT_GENERATION_SETTINGS.size,
@@ -154,7 +200,7 @@ export function useImageChat() {
   const repositoryRef = useRef(createImageChatRepository());
   const messageObjectUrlsRef = useRef<string[]>([]);
   const galleryObjectUrlsRef = useRef<string[]>([]);
-  const referenceObjectUrlRef = useRef<string | null>(null);
+  const referenceObjectUrlsRef = useRef(new Map<string, string>());
   const activeConversationIdRef = useRef<string | null>(null);
   const pollingTaskIdsRef = useRef(new Set<string>());
   const isDisposedRef = useRef(false);
@@ -170,8 +216,9 @@ export function useImageChat() {
     []
   );
   const [galleryImages, setGalleryImages] = useState<RenderedGalleryImage[]>([]);
-  const [selectedReferenceImage, setSelectedReferenceImage] =
-    useState<ComposerReferenceImage | null>(null);
+  const [selectedReferenceImages, setSelectedReferenceImages] = useState<
+    ComposerReferenceImage[]
+  >([]);
   const [settings, setSettings] = useState<GenerationSettings>(() => {
     return DEFAULT_GENERATION_SETTINGS;
   });
@@ -202,12 +249,24 @@ export function useImageChat() {
   }, []);
 
   const clearReferenceImage = useCallback(() => {
-    if (referenceObjectUrlRef.current) {
-      URL.revokeObjectURL(referenceObjectUrlRef.current);
-      referenceObjectUrlRef.current = null;
+    referenceObjectUrlsRef.current.forEach((objectUrl) => {
+      URL.revokeObjectURL(objectUrl);
+    });
+    referenceObjectUrlsRef.current.clear();
+    setSelectedReferenceImages([]);
+  }, []);
+
+  const removeReferenceImage = useCallback((referenceId: string) => {
+    const objectUrl = referenceObjectUrlsRef.current.get(referenceId);
+
+    if (objectUrl) {
+      URL.revokeObjectURL(objectUrl);
+      referenceObjectUrlsRef.current.delete(referenceId);
     }
 
-    setSelectedReferenceImage(null);
+    setSelectedReferenceImages((current) =>
+      current.filter((referenceImage) => referenceImage.id !== referenceId)
+    );
   }, []);
 
   const hydrateRenderedMessages = useCallback(
@@ -237,20 +296,26 @@ export function useImageChat() {
         }
 
         const asset = message.assetId ? assetsById.get(message.assetId) : undefined;
-        const referenceAsset = message.referenceAssetId
-          ? assetsById.get(message.referenceAssetId)
-          : undefined;
+        const referenceAssetIds = getMessageReferenceAssetIds(message);
+        const referenceAssets = referenceAssetIds
+          .map((referenceAssetId) => assetsById.get(referenceAssetId))
+          .filter((asset): asset is ImageAssetRecord => Boolean(asset));
         const objectUrl = asset ? URL.createObjectURL(asset.blob) : undefined;
-        const referenceObjectUrl = referenceAsset
-          ? URL.createObjectURL(referenceAsset.blob)
-          : undefined;
+        const referenceImages = referenceAssets.map((referenceAsset) => {
+          const referenceObjectUrl = URL.createObjectURL(referenceAsset.blob);
+
+          nextObjectUrls.push(referenceObjectUrl);
+
+          return {
+            src: referenceObjectUrl,
+            mimeType: referenceAsset.mimeType,
+            width: referenceAsset.width,
+            height: referenceAsset.height,
+          };
+        });
 
         if (objectUrl) {
           nextObjectUrls.push(objectUrl);
-        }
-
-        if (referenceObjectUrl) {
-          nextObjectUrls.push(referenceObjectUrl);
         }
 
         return {
@@ -262,6 +327,7 @@ export function useImageChat() {
           settings: extractGenerationSettings(message.settings),
           assetId: message.assetId,
           referenceAssetId: message.referenceAssetId,
+          referenceAssetIds,
           errorMessage: message.errorMessage,
           image: asset
             ? {
@@ -271,14 +337,8 @@ export function useImageChat() {
                 height: asset.height,
               }
             : undefined,
-          referenceImage: referenceAsset
-            ? {
-                src: referenceObjectUrl!,
-                mimeType: referenceAsset.mimeType,
-                width: referenceAsset.width,
-                height: referenceAsset.height,
-              }
-            : undefined,
+          referenceImage: referenceImages[0],
+          referenceImages: referenceImages.length > 0 ? referenceImages : undefined,
         };
       });
 
@@ -408,6 +468,9 @@ export function useImageChat() {
       };
 
       if (taskStatus.status === "completed") {
+        const referenceAssetIds = assistantMessage
+          ? getMessageReferenceAssetIds(assistantMessage)
+          : [];
         const blob = base64ToBlob(
           taskStatus.image.b64,
           taskStatus.image.mimeType
@@ -444,7 +507,9 @@ export function useImageChat() {
           prompt: taskStatus.params.prompt,
           settings: resolvedSettings,
           assetId,
-          referenceAssetId: assistantMessage?.referenceAssetId,
+          referenceAssetId: referenceAssetIds[0],
+          referenceAssetIds:
+            referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
           remoteTaskId: undefined,
           createdAt: assistantMessage?.createdAt ?? taskStatus.createdAt,
           updatedAt: taskStatus.createdAt,
@@ -462,6 +527,10 @@ export function useImageChat() {
         return false;
       }
 
+      const referenceAssetIds = assistantMessage
+        ? getMessageReferenceAssetIds(assistantMessage)
+        : [];
+
       await repository.upsertConversation({
         id: conversationRecord.id,
         title: conversationRecord.title,
@@ -475,7 +544,9 @@ export function useImageChat() {
         status: "failed",
         prompt: assistantMessage?.prompt ?? "",
         settings: extractGenerationSettings(assistantMessage?.settings),
-        referenceAssetId: assistantMessage?.referenceAssetId,
+        referenceAssetId: referenceAssetIds[0],
+        referenceAssetIds:
+          referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
         errorMessage: taskStatus.error.message,
         remoteTaskId: undefined,
         createdAt: assistantMessage?.createdAt ?? taskStatus.createdAt,
@@ -510,6 +581,9 @@ export function useImageChat() {
       const assistantMessage = detail?.messages.find(
         (message) => message.id === assistantMessageId
       );
+      const referenceAssetIds = assistantMessage
+        ? getMessageReferenceAssetIds(assistantMessage)
+        : [];
       const failedAt = updatedAt ?? new Date().toISOString();
       const conversationRecord = detail?.conversation ?? {
         id: conversationId,
@@ -532,7 +606,9 @@ export function useImageChat() {
         status: "failed",
         prompt,
         settings: extractGenerationSettings(assistantMessage?.settings ?? failureSettings),
-        referenceAssetId: assistantMessage?.referenceAssetId,
+        referenceAssetId: referenceAssetIds[0],
+        referenceAssetIds:
+          referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
         errorMessage,
         remoteTaskId: undefined,
         createdAt: assistantMessage?.createdAt ?? failedAt,
@@ -754,6 +830,63 @@ export function useImageChat() {
     setRememberProviderConfig(remember);
   }, []);
 
+  const addReferenceImageFiles = useCallback(
+    async (files: File[]) => {
+      const supportedFiles = files.filter(isSupportedReferenceImage);
+      const availableSlots = MAX_REFERENCE_IMAGES - selectedReferenceImages.length;
+
+      if (files.length > supportedFiles.length) {
+        toast.error("参考图仅支持 PNG、JPEG 或 WebP。");
+      }
+
+      if (availableSlots <= 0) {
+        toast.error(`最多只能选择 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+        return;
+      }
+
+      const filesToAdd = supportedFiles.slice(0, availableSlots);
+
+      if (supportedFiles.length > availableSlots) {
+        toast.error(`最多只能选择 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+      }
+
+      const additions: ComposerReferenceImage[] = [];
+
+      for (const file of filesToAdd) {
+        const referenceId = createUuid();
+        const objectUrl = URL.createObjectURL(file);
+
+        try {
+          const dimensions = await readImageDimensions(objectUrl);
+
+          referenceObjectUrlsRef.current.set(referenceId, objectUrl);
+          additions.push({
+            id: referenceId,
+            prompt: file.name || "上传参考图",
+            blob: file,
+            image: {
+              src: objectUrl,
+              mimeType: file.type,
+              width: dimensions.width,
+              height: dimensions.height,
+            },
+          });
+        } catch {
+          URL.revokeObjectURL(objectUrl);
+          toast.error(`无法读取参考图：${file.name || "未命名图片"}`);
+        }
+      }
+
+      if (additions.length === 0) {
+        return;
+      }
+
+      setSelectedReferenceImages((current) => [...current, ...additions]);
+      toast.success(`已添加 ${additions.length} 张参考图`);
+    },
+    [selectedReferenceImages.length]
+  );
+
   const useReferenceImage = useCallback(
     (messageId: string) => {
       const currentConversation = activeConversation;
@@ -783,27 +916,42 @@ export function useImageChat() {
         return;
       }
 
-      if (referenceObjectUrlRef.current) {
-        URL.revokeObjectURL(referenceObjectUrlRef.current);
+      if (
+        selectedReferenceImages.some(
+          (referenceImage) => referenceImage.assetId === asset.id
+        )
+      ) {
+        toast.error("这张图片已经在参考图中。");
+        return;
+      }
+
+      if (selectedReferenceImages.length >= MAX_REFERENCE_IMAGES) {
+        toast.error(`最多只能选择 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+        return;
       }
 
       const objectUrl = URL.createObjectURL(asset.blob);
-      referenceObjectUrlRef.current = objectUrl;
+      referenceObjectUrlsRef.current.set(asset.id, objectUrl);
 
-      setSelectedReferenceImage({
-        assetId: asset.id,
-        messageId,
-        prompt: assistantMessage.prompt,
-        image: {
-          src: objectUrl,
-          mimeType: asset.mimeType,
-          width: asset.width,
-          height: asset.height,
+      setSelectedReferenceImages((current) => [
+        ...current,
+        {
+          id: asset.id,
+          assetId: asset.id,
+          messageId,
+          prompt: assistantMessage.prompt,
+          blob: asset.blob,
+          image: {
+            src: objectUrl,
+            mimeType: asset.mimeType,
+            width: asset.width,
+            height: asset.height,
+          },
         },
-      });
-      toast.success("已设为参考图，下一条提示词会基于它继续生成");
+      ]);
+      toast.success("已添加到参考图，下一条提示词会基于它继续生成");
     },
-    [activeConversation]
+    [activeConversation, selectedReferenceImages]
   );
 
   const startNewConversation = useCallback(async () => {
@@ -857,13 +1005,13 @@ export function useImageChat() {
     async (
       prompt: string,
       requestSettings?: GenerationSettings,
-      referenceAssetId?: string
+      referenceAssetIds?: string | string[]
     ) => {
       const repository = repositoryRef.current;
       const normalizedPrompt = prompt.trim();
       const appliedSettings = requestSettings ?? settings;
-      const resolvedReferenceAssetId =
-        referenceAssetId ?? selectedReferenceImage?.assetId;
+      const explicitReferenceAssetIds =
+        normalizeReferenceAssetIds(referenceAssetIds);
       const hasConnectionConfig =
         connectionConfig.apiKey.trim().length > 0 &&
         connectionConfig.baseUrl.trim().length > 0 &&
@@ -883,16 +1031,46 @@ export function useImageChat() {
         return;
       }
 
-      const referenceAsset = resolvedReferenceAssetId
-        ? activeConversation?.assets.find(
-            (asset) => asset.id === resolvedReferenceAssetId
-          )
-        : undefined;
+      const referenceInputs = explicitReferenceAssetIds.length
+        ? explicitReferenceAssetIds.map((referenceAssetId) => {
+            const asset = activeConversation?.assets.find(
+              (candidate) => candidate.id === referenceAssetId
+            );
 
-      if (resolvedReferenceAssetId && !referenceAsset) {
+            return asset
+              ? {
+                  assetId: asset.id,
+                  blob: asset.blob,
+                  mimeType: asset.mimeType,
+                  width: asset.width,
+                  height: asset.height,
+                  createdAt: asset.createdAt,
+                }
+              : null;
+          })
+        : selectedReferenceImages.map((referenceImage) => ({
+            assetId: referenceImage.assetId,
+            blob: referenceImage.blob,
+            mimeType: referenceImage.image.mimeType,
+            width: referenceImage.image.width,
+            height: referenceImage.image.height,
+            createdAt: new Date().toISOString(),
+          }));
+
+      if (referenceInputs.some((referenceInput) => !referenceInput)) {
         toast.error("参考图不可用，请重新选择后再试。");
         return;
       }
+
+      if (referenceInputs.length > MAX_REFERENCE_IMAGES) {
+        toast.error(`最多只能选择 ${MAX_REFERENCE_IMAGES} 张参考图。`);
+        return;
+      }
+
+      const resolvedReferenceInputs = referenceInputs.filter(
+        (referenceInput): referenceInput is NonNullable<typeof referenceInput> =>
+          Boolean(referenceInput)
+      );
 
       setIsSubmitting(true);
 
@@ -904,12 +1082,15 @@ export function useImageChat() {
         existingConversation?.title ?? buildConversationTitle(normalizedPrompt);
       const userMessageId = createUuid();
       const assistantMessageId = createUuid();
-      const referenceImage = referenceAsset
-        ? {
-            b64: await blobToBase64(referenceAsset.blob),
-            mimeType: referenceAsset.mimeType,
-          }
-        : undefined;
+      const resolvedReferenceAssetIds = resolvedReferenceInputs.map(
+        (referenceInput) => referenceInput.assetId ?? createUuid()
+      );
+      const referenceImages = await Promise.all(
+        resolvedReferenceInputs.map(async (referenceInput) => ({
+          b64: await blobToBase64(referenceInput.blob),
+          mimeType: referenceInput.mimeType,
+        }))
+      );
 
       const baseConversation = {
         id: conversationId,
@@ -935,11 +1116,33 @@ export function useImageChat() {
         status: "pending",
         prompt: normalizedPrompt,
         settings: appliedSettings,
-        referenceAssetId: resolvedReferenceAssetId,
+        referenceAssetId: resolvedReferenceAssetIds[0],
+        referenceAssetIds:
+          resolvedReferenceAssetIds.length > 0
+            ? resolvedReferenceAssetIds
+            : undefined,
         remoteTaskId: undefined,
         createdAt: now,
         updatedAt: now,
       });
+      await Promise.all(
+        resolvedReferenceInputs.map((referenceInput, index) => {
+          if (referenceInput.assetId) {
+            return Promise.resolve();
+          }
+
+          return repository.upsertAsset({
+            id: resolvedReferenceAssetIds[index]!,
+            conversationId,
+            messageId: assistantMessageId,
+            blob: referenceInput.blob,
+            mimeType: referenceInput.mimeType,
+            width: referenceInput.width,
+            height: referenceInput.height,
+            createdAt: now,
+          });
+        })
+      );
 
       await syncConversationState(conversationId);
 
@@ -948,7 +1151,7 @@ export function useImageChat() {
           {
             prompt: normalizedPrompt,
             ...appliedSettings,
-            ...(referenceImage ? { referenceImage } : {}),
+            ...(referenceImages.length > 0 ? { referenceImages } : {}),
           },
           connectionConfig,
           publicKeyResponse
@@ -961,7 +1164,11 @@ export function useImageChat() {
           status: "pending",
           prompt: normalizedPrompt,
           settings: appliedSettings,
-          referenceAssetId: resolvedReferenceAssetId,
+          referenceAssetId: resolvedReferenceAssetIds[0],
+          referenceAssetIds:
+            resolvedReferenceAssetIds.length > 0
+              ? resolvedReferenceAssetIds
+              : undefined,
           remoteTaskId: task.taskId,
           createdAt: now,
           updatedAt: task.createdAt,
@@ -999,7 +1206,11 @@ export function useImageChat() {
           status: "failed",
           prompt: normalizedPrompt,
           settings: appliedSettings,
-          referenceAssetId: resolvedReferenceAssetId,
+          referenceAssetId: resolvedReferenceAssetIds[0],
+          referenceAssetIds:
+            resolvedReferenceAssetIds.length > 0
+              ? resolvedReferenceAssetIds
+              : undefined,
           errorMessage: message,
           remoteTaskId: undefined,
           createdAt: now,
@@ -1021,7 +1232,7 @@ export function useImageChat() {
       pollTaskUntilSettled,
       publicKeyResponse,
       publicKeyStatus,
-      selectedReferenceImage?.assetId,
+      selectedReferenceImages,
       settings,
       syncConversationState,
     ]
@@ -1084,7 +1295,7 @@ export function useImageChat() {
       await submitPrompt(
         message.prompt,
         message.settings,
-        message.referenceAssetId
+        message.referenceAssetIds ?? message.referenceAssetId
       );
     },
     [activeAssistantMessages, submitPrompt]
@@ -1104,7 +1315,8 @@ export function useImageChat() {
     activeConversation,
     renderedMessages,
     galleryImages,
-    selectedReferenceImage,
+    selectedReferenceImage: selectedReferenceImages[0] ?? null,
+    selectedReferenceImages,
     settings,
     connectionConfig,
     rememberProviderConfig,
@@ -1121,6 +1333,8 @@ export function useImageChat() {
     deleteConversation,
     toggleConversationPinned,
     clearReferenceImage,
+    removeReferenceImage,
+    addReferenceImageFiles,
     submitPrompt,
     copyPrompt,
     downloadImage,

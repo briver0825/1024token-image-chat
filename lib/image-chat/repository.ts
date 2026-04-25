@@ -120,6 +120,14 @@ function mergeConversationRecord(
   };
 }
 
+function getMessageAssetIds(message: MessageRecord) {
+  return [
+    ...(message.assetId ? [message.assetId] : []),
+    ...(message.referenceAssetId ? [message.referenceAssetId] : []),
+    ...(message.referenceAssetIds ?? []),
+  ];
+}
+
 export function createImageChatRepository(databaseName = "image-chat") {
   let databasePromise: Promise<IDBPDatabase<ImageChatDBSchema>> | null = null;
 
@@ -163,23 +171,19 @@ export function createImageChatRepository(databaseName = "image-chat") {
         "by-conversation",
         conversationId
       );
-      const assetIdsToPrune = [
-        ...new Set(
-          messages.flatMap((message) => (message.assetId ? [message.assetId] : []))
-        ),
-      ];
+      const assetIdsToPrune = [...new Set(messages.flatMap(getMessageAssetIds))];
       await database.delete("conversations", conversationId);
 
       await Promise.all(
         messages.map((message) => database.delete("messages", message.id))
       );
 
+      const remainingMessages = await database.getAll("messages");
+
       for (const assetId of assetIdsToPrune) {
-        const remainingReferences = await database.countFromIndex(
-          "messages",
-          "by-asset-id",
-          assetId
-        );
+        const remainingReferences = remainingMessages.filter((message) =>
+          getMessageAssetIds(message).includes(assetId)
+        ).length;
 
         if (remainingReferences === 0) {
           await database.delete("assets", assetId);
@@ -240,9 +244,9 @@ export function createImageChatRepository(databaseName = "image-chat") {
       );
       const assets = (
         await Promise.all(
-          [...new Set(
-            messages.flatMap((message) => (message.assetId ? [message.assetId] : []))
-          )].map((assetId) => database.get("assets", assetId))
+          [...new Set(messages.flatMap(getMessageAssetIds))].map((assetId) =>
+            database.get("assets", assetId)
+          )
         )
       ).filter((asset): asset is ImageAssetRecord => Boolean(asset));
 

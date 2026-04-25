@@ -13,6 +13,7 @@ export const IMAGE_QUALITY_OPTIONS = [
 ] as const;
 
 export const IMAGE_OUTPUT_FORMAT_OPTIONS = ["png", "jpeg", "webp"] as const;
+export const MAX_REFERENCE_IMAGES = 16;
 
 export type ImageSize = (typeof IMAGE_SIZE_OPTIONS)[number];
 export type ImageQuality = (typeof IMAGE_QUALITY_OPTIONS)[number];
@@ -35,6 +36,7 @@ export type GenerateReferenceImage = {
 };
 
 export type GenerateTaskRequest = GenerateRequest & {
+  referenceImages?: GenerateReferenceImage[];
   referenceImage?: GenerateReferenceImage;
 };
 
@@ -153,6 +155,7 @@ export type MessageRecord = {
   settings?: GenerationSettings;
   assetId?: string;
   referenceAssetId?: string;
+  referenceAssetIds?: string[];
   errorMessage?: string;
   remoteTaskId?: string;
   createdAt: string;

@@ -27,6 +27,7 @@ const useImageChatState = vi.hoisted(() => ({
       },
     })),
     selectedReferenceImage: null,
+    selectedReferenceImages: [],
     settings: {
       size: "1024x1024",
       quality: "high",
@@ -50,6 +51,8 @@ const useImageChatState = vi.hoisted(() => ({
     deleteConversation: vi.fn(),
     toggleConversationPinned: vi.fn(),
     clearReferenceImage: vi.fn(),
+    removeReferenceImage: vi.fn(),
+    addReferenceImageFiles: vi.fn(),
     submitPrompt: vi.fn(),
     copyPrompt: vi.fn(),
     downloadImage: vi.fn(),

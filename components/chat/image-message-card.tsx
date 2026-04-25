@@ -41,6 +41,12 @@ export type ImageMessageCardData = {
     width: number;
     height: number;
   };
+  referenceImages?: Array<{
+    src: string;
+    mimeType: string;
+    width: number;
+    height: number;
+  }>;
 };
 
 type ImageMessageCardProps = {
@@ -107,27 +113,34 @@ function ImageActionButtons({
 }
 
 function ReferenceImageSummary({
-  image,
+  images,
 }: {
-  image: NonNullable<ImageMessageCardData["referenceImage"]>;
+  images: NonNullable<ImageMessageCardData["referenceImages"]>;
 }) {
+  const isMultiple = images.length > 1;
+
   return (
     <div className="flex items-start gap-3 rounded-2xl border border-primary/15 bg-primary/5 p-3">
-      <div className="overflow-hidden rounded-xl border border-border/60 bg-background/70 p-1.5">
-        <img
-          src={image.src}
-          alt="参考图缩略图"
-          width={image.width}
-          height={image.height}
-          className="h-14 w-auto max-w-24 object-contain"
-        />
+      <div className="flex max-w-32 -space-x-2 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-1.5">
+        {images.slice(0, 4).map((image, index) => (
+          <img
+            key={`${image.src}-${index}`}
+            src={image.src}
+            alt={`参考图缩略图 ${index + 1}`}
+            width={image.width}
+            height={image.height}
+            className="h-14 w-14 rounded-lg border border-background object-cover"
+          />
+        ))}
       </div>
       <div className="min-w-0 space-y-1">
         <Badge className="rounded-full bg-primary/15 text-primary hover:bg-primary/15">
-          参考图续画
+          {isMultiple ? `参考图续画 · ${images.length} 张` : "参考图续画"}
         </Badge>
         <p className="text-xs leading-5 text-muted-foreground">
-          本次生成会参考这张图继续延展。
+          {isMultiple
+            ? "本次生成会参考这些图片继续延展。"
+            : "本次生成会参考这张图继续延展。"}
         </p>
       </div>
     </div>
@@ -164,6 +177,9 @@ export function ImageMessageCard({
   onUseAsReference,
 }: ImageMessageCardProps) {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const referenceImages =
+    message.referenceImages ??
+    (message.referenceImage ? [message.referenceImage] : []);
 
   if (message.status === "pending") {
     return (
@@ -178,8 +194,8 @@ export function ImageMessageCard({
               {formatTimestamp(message.createdAt)}
             </span>
           </div>
-          {message.referenceImage ? (
-            <ReferenceImageSummary image={message.referenceImage} />
+          {referenceImages.length > 0 ? (
+            <ReferenceImageSummary images={referenceImages} />
           ) : null}
           <div className="relative overflow-hidden rounded-2xl border border-border/60 bg-gradient-to-br from-primary/10 via-background to-primary/5 p-5">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(255,255,255,0.08),transparent_45%)]" />
@@ -235,8 +251,8 @@ export function ImageMessageCard({
               {message.errorMessage ?? "请调整提示词或稍后重试。"}
             </AlertDescription>
           </Alert>
-          {message.referenceImage ? (
-            <ReferenceImageSummary image={message.referenceImage} />
+          {referenceImages.length > 0 ? (
+            <ReferenceImageSummary images={referenceImages} />
           ) : null}
           <div className="flex justify-end">
             <Button
@@ -277,8 +293,8 @@ export function ImageMessageCard({
             />
           </div>
 
-          {message.referenceImage ? (
-            <ReferenceImageSummary image={message.referenceImage} />
+          {referenceImages.length > 0 ? (
+            <ReferenceImageSummary images={referenceImages} />
           ) : null}
 
           <button

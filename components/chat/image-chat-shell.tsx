@@ -131,7 +131,7 @@ export function ImageChatShell() {
     activeConversation,
     renderedMessages,
     galleryImages,
-    selectedReferenceImage,
+    selectedReferenceImages,
     settings,
     connectionConfig,
     rememberProviderConfig,
@@ -147,6 +147,8 @@ export function ImageChatShell() {
     deleteConversation,
     toggleConversationPinned,
     clearReferenceImage,
+    removeReferenceImage,
+    addReferenceImageFiles,
     submitPrompt,
     copyPrompt,
     downloadImage,
@@ -415,8 +417,10 @@ export function ImageChatShell() {
                       canSubmit={canSubmit}
                       disabledHint="请先在右侧填写 API Key、Base URL 和模型，并等待公钥就绪。"
                       isSubmitting={isSubmitting}
-                      referenceImage={selectedReferenceImage}
-                      onClearReference={clearReferenceImage}
+                      referenceImages={selectedReferenceImages}
+                      onClearReferences={clearReferenceImage}
+                      onRemoveReference={removeReferenceImage}
+                      onUploadReferenceImages={addReferenceImageFiles}
                       onSubmit={(prompt) => submitPrompt(prompt)}
                     />
                   </div>

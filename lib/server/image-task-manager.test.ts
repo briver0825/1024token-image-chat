@@ -112,7 +112,7 @@ describe("image-task-manager", () => {
     });
   });
 
-  it("uses the edits endpoint with multipart form data when a reference image is provided", async () => {
+  it("uses the edits endpoint with multipart form data when reference images are provided", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -131,10 +131,16 @@ describe("image-task-manager", () => {
     const created = createImageGenerationTask({
       request: {
         ...request,
-        referenceImage: {
-          b64: "ZmFrZS1yZWZlcmVuY2U=",
-          mimeType: "image/png",
-        },
+        referenceImages: [
+          {
+            b64: "ZmFrZS1yZWZlcmVuY2U=",
+            mimeType: "image/png",
+          },
+          {
+            b64: "c2Vjb25kLXJlZmVyZW5jZQ==",
+            mimeType: "image/webp",
+          },
+        ],
       },
       providerConfig,
       fetchImpl,
@@ -154,15 +160,19 @@ describe("image-task-manager", () => {
     expect(init.body).toBeInstanceOf(FormData);
 
     const body = init.body as FormData;
-    const image = body.get("image");
+    const images = body.getAll("image[]");
 
     expect(body.get("model")).toBe("gpt-image-2");
     expect(body.get("prompt")).toBe(request.prompt);
     expect(body.get("size")).toBe(request.size);
     expect(body.get("quality")).toBe(request.quality);
     expect(body.get("output_format")).toBe(request.outputFormat);
-    expect(image).toBeInstanceOf(File);
-    expect((image as File).type).toBe("image/png");
+    expect(body.get("image")).toBeNull();
+    expect(images).toHaveLength(2);
+    expect(images[0]).toBeInstanceOf(File);
+    expect(images[1]).toBeInstanceOf(File);
+    expect((images[0] as File).type).toBe("image/png");
+    expect((images[1] as File).type).toBe("image/webp");
 
     await vi.waitFor(() => {
       expect(getImageGenerationTaskStatus(created.taskId)).toMatchObject({

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   ProviderHttpError,
+  buildProviderRequestInit,
   mapProviderSuccess,
   normalizeProviderError,
   parseGenerateRequest,
@@ -49,6 +50,67 @@ describe("parseGenerateRequest", () => {
         outputCompression: 80,
       })
     ).toThrow("compression");
+  });
+
+  it("accepts up to 16 reference images and rejects extras", () => {
+    const referenceImages = Array.from({ length: 16 }, (_, index) => ({
+      b64: `cmVmZXJlbmNl-${index}`,
+      mimeType: "image/png",
+    }));
+
+    expect(
+      parseGenerateRequest({
+        ...validRequest,
+        referenceImages,
+      })
+    ).toMatchObject({
+      ...validRequest,
+      referenceImages,
+    });
+
+    expect(() =>
+      parseGenerateRequest({
+        ...validRequest,
+        referenceImages: [
+          ...referenceImages,
+          {
+            b64: "ZXh0cmE=",
+            mimeType: "image/png",
+          },
+        ],
+      })
+    ).toThrow("16");
+  });
+});
+
+describe("buildProviderRequestInit", () => {
+  it("uses the official image[] multipart field for multiple reference images", () => {
+    const requestInit = buildProviderRequestInit("gpt-image-2", {
+      ...validRequest,
+      referenceImages: [
+        {
+          b64: "Zmlyc3Q=",
+          mimeType: "image/png",
+        },
+        {
+          b64: "c2Vjb25k",
+          mimeType: "image/jpeg",
+        },
+      ],
+    });
+
+    expect(requestInit.endpointPath).toBe("edits");
+    expect(requestInit.body).toBeInstanceOf(FormData);
+
+    const body = requestInit.body as FormData;
+    const images = body.getAll("image[]");
+
+    expect(images).toHaveLength(2);
+    expect(body.get("image")).toBeNull();
+    expect(images[0]).toBeInstanceOf(File);
+    expect(images[1]).toBeInstanceOf(File);
+    expect((images[0] as File).type).toBe("image/png");
+    expect((images[1] as File).type).toBe("image/jpeg");
   });
 });
 

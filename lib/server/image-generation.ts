@@ -4,6 +4,7 @@ import {
   IMAGE_OUTPUT_FORMAT_OPTIONS,
   IMAGE_QUALITY_OPTIONS,
   IMAGE_SIZE_OPTIONS,
+  MAX_REFERENCE_IMAGES,
   type GenerateErrorResponse,
   type GenerateRequest,
   type GenerateTaskRequest,
@@ -15,6 +16,11 @@ import {
 const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MIN_PROVIDER_TIMEOUT_MS = 1_000;
 
+const referenceImageSchema = z.object({
+  b64: z.string().transform((value) => value.trim()),
+  mimeType: z.string().transform((value) => value.trim()),
+});
+
 const generateRequestSchema = z
   .object({
     prompt: z.string().transform((value) => value.trim()),
@@ -22,12 +28,8 @@ const generateRequestSchema = z
     quality: z.enum(IMAGE_QUALITY_OPTIONS),
     outputFormat: z.enum(IMAGE_OUTPUT_FORMAT_OPTIONS),
     outputCompression: z.number().int().min(0).max(100).optional(),
-    referenceImage: z
-      .object({
-        b64: z.string().transform((value) => value.trim()),
-        mimeType: z.string().transform((value) => value.trim()),
-      })
-      .optional(),
+    referenceImage: referenceImageSchema.optional(),
+    referenceImages: z.array(referenceImageSchema).max(MAX_REFERENCE_IMAGES).optional(),
   })
   .superRefine((value, ctx) => {
     if (!value.prompt) {
@@ -46,23 +48,36 @@ const generateRequestSchema = z
       });
     }
 
-    if (value.referenceImage) {
-      if (!value.referenceImage.b64) {
+    const referenceImages = [
+      ...(value.referenceImage ? [value.referenceImage] : []),
+      ...(value.referenceImages ?? []),
+    ];
+
+    if (referenceImages.length > MAX_REFERENCE_IMAGES) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `referenceImages 最多支持 ${MAX_REFERENCE_IMAGES} 张`,
+        path: ["referenceImages"],
+      });
+    }
+
+    referenceImages.forEach((referenceImage, index) => {
+      if (!referenceImage.b64) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "referenceImage.b64 不能为空",
-          path: ["referenceImage", "b64"],
+          message: "referenceImages.b64 不能为空",
+          path: ["referenceImages", index, "b64"],
         });
       }
 
-      if (!/^image\/(png|jpeg|webp)$/i.test(value.referenceImage.mimeType)) {
+      if (!/^image\/(png|jpeg|webp)$/i.test(referenceImage.mimeType)) {
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
-          message: "referenceImage.mimeType 仅支持 png/jpeg/webp",
-          path: ["referenceImage", "mimeType"],
+          message: "referenceImages.mimeType 仅支持 png/jpeg/webp",
+          path: ["referenceImages", index, "mimeType"],
         });
       }
-    }
+    });
   });
 
 export class InputValidationError extends Error {
@@ -108,7 +123,22 @@ export function parseGenerateRequest(input: unknown): GenerateTaskRequest {
     );
   }
 
-  return result.data;
+  const parsed = result.data;
+  const referenceImages = [
+    ...(parsed.referenceImage ? [parsed.referenceImage] : []),
+    ...(parsed.referenceImages ?? []),
+  ];
+
+  return {
+    prompt: parsed.prompt,
+    size: parsed.size,
+    quality: parsed.quality,
+    outputFormat: parsed.outputFormat,
+    ...(parsed.outputCompression !== undefined
+      ? { outputCompression: parsed.outputCompression }
+      : {}),
+    ...(referenceImages.length ? { referenceImages } : {}),
+  };
 }
 
 export function stripReferenceImage(
@@ -360,8 +390,12 @@ export function buildProviderRequestInit(
   body: BodyInit;
 } {
   const baseRequest = stripReferenceImage(request);
+  const referenceImages = [
+    ...(request.referenceImage ? [request.referenceImage] : []),
+    ...(request.referenceImages ?? []),
+  ];
 
-  if (!request.referenceImage) {
+  if (referenceImages.length === 0) {
     return {
       endpointPath: "generations",
       headers: {
@@ -383,16 +417,18 @@ export function buildProviderRequestInit(
     formData.set("output_compression", String(request.outputCompression));
   }
 
-  formData.set(
-    "image",
-    new File(
-      [base64ToUint8Array(request.referenceImage.b64)],
-      `reference.${mimeTypeToExtension(request.referenceImage.mimeType)}`,
-      {
-        type: request.referenceImage.mimeType,
-      }
-    )
-  );
+  referenceImages.forEach((referenceImage, index) => {
+    formData.append(
+      "image[]",
+      new File(
+        [base64ToUint8Array(referenceImage.b64)],
+        `reference-${index + 1}.${mimeTypeToExtension(referenceImage.mimeType)}`,
+        {
+          type: referenceImage.mimeType,
+        }
+      )
+    );
+  });
 
   return {
     endpointPath: "edits",

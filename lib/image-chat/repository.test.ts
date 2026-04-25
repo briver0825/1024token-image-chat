@@ -78,6 +78,60 @@ describe("createImageChatRepository", () => {
     });
   });
 
+  it("loads assets referenced by multiple reference asset ids", async () => {
+    const repository = createImageChatRepository("image-chat-test-reference-assets");
+
+    await repository.upsertConversation({
+      id: "conv-reference",
+      title: "多参考图",
+      createdAt: "2026-04-25T12:00:00.000Z",
+      updatedAt: "2026-04-25T12:00:00.000Z",
+    });
+    await repository.upsertMessage({
+      id: "assistant-reference",
+      conversationId: "conv-reference",
+      role: "assistant",
+      status: "pending",
+      prompt: "基于多张参考图生成",
+      referenceAssetIds: ["reference-a", "reference-b"],
+      createdAt: "2026-04-25T12:00:00.000Z",
+      updatedAt: "2026-04-25T12:00:00.000Z",
+    });
+    await repository.upsertAsset({
+      id: "reference-a",
+      conversationId: "conv-reference",
+      messageId: "assistant-reference",
+      blob: new Blob(["reference-a"], { type: "image/png" }),
+      mimeType: "image/png",
+      width: 1024,
+      height: 1024,
+      createdAt: "2026-04-25T12:00:00.000Z",
+    });
+    await repository.upsertAsset({
+      id: "reference-b",
+      conversationId: "conv-reference",
+      messageId: "assistant-reference",
+      blob: new Blob(["reference-b"], { type: "image/webp" }),
+      mimeType: "image/webp",
+      width: 1536,
+      height: 1024,
+      createdAt: "2026-04-25T12:00:00.000Z",
+    });
+
+    await expect(repository.getConversationDetail("conv-reference")).resolves.toMatchObject({
+      assets: [
+        {
+          id: "reference-a",
+          mimeType: "image/png",
+        },
+        {
+          id: "reference-b",
+          mimeType: "image/webp",
+        },
+      ],
+    });
+  });
+
   it("deletes a conversation together with its messages and assets", async () => {
     const repository = createImageChatRepository("image-chat-test-delete");
 
