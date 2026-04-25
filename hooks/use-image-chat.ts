@@ -1076,6 +1076,7 @@ export function useImageChat() {
       setIsSubmitting(true);
 
       const now = new Date().toISOString();
+      const assistantCreatedAt = new Date(Date.parse(now) + 1).toISOString();
       const conversationId = activeConversationId ?? createUuid();
       const existingConversation = activeConversation?.conversation;
       const conversationCreatedAt = existingConversation?.createdAt ?? now;
@@ -1123,8 +1124,8 @@ export function useImageChat() {
             ? resolvedReferenceAssetIds
             : undefined,
         remoteTaskId: undefined,
-        createdAt: now,
-        updatedAt: now,
+        createdAt: assistantCreatedAt,
+        updatedAt: assistantCreatedAt,
       });
       await Promise.all(
         resolvedReferenceInputs.map((referenceInput, index) => {
@@ -1171,7 +1172,7 @@ export function useImageChat() {
               ? resolvedReferenceAssetIds
               : undefined,
           remoteTaskId: task.taskId,
-          createdAt: now,
+          createdAt: assistantCreatedAt,
           updatedAt: task.createdAt,
         });
         await repository.upsertConversation({
@@ -1214,7 +1215,7 @@ export function useImageChat() {
               : undefined,
           errorMessage: message,
           remoteTaskId: undefined,
-          createdAt: now,
+          createdAt: assistantCreatedAt,
           updatedAt: failedAt,
         });
 

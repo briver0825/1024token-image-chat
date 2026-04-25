@@ -90,6 +90,28 @@ function sortByDateAsc<T extends { createdAt: string }>(items: T[]) {
   );
 }
 
+function sortMessagesAsc(items: MessageRecord[]) {
+  return [...items].sort((left, right) => {
+    const createdAtComparison = left.createdAt.localeCompare(right.createdAt);
+
+    if (createdAtComparison !== 0) {
+      return createdAtComparison;
+    }
+
+    if (left.role !== right.role) {
+      return left.role === "user" ? -1 : 1;
+    }
+
+    const updatedAtComparison = left.updatedAt.localeCompare(right.updatedAt);
+
+    if (updatedAtComparison !== 0) {
+      return updatedAtComparison;
+    }
+
+    return left.id.localeCompare(right.id);
+  });
+}
+
 function sortByDateDesc<T extends { createdAt: string }>(items: T[]) {
   return [...items].sort((left, right) =>
     right.createdAt.localeCompare(left.createdAt)
@@ -256,7 +278,7 @@ export function createImageChatRepository(databaseName = "image-chat") {
           pinned: Boolean(conversation.pinned),
           messageCount: messages.length,
         },
-        messages: sortByDateAsc(messages),
+        messages: sortMessagesAsc(messages),
         assets: sortByDateAsc(assets),
       };
     },

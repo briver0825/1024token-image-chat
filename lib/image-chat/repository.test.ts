@@ -78,6 +78,50 @@ describe("createImageChatRepository", () => {
     });
   });
 
+  it("keeps the user prompt before the matching assistant image when timestamps are equal", async () => {
+    const repository = createImageChatRepository("image-chat-test-message-order");
+    const createdAt = "2026-04-26T12:00:00.000Z";
+
+    await repository.upsertConversation({
+      id: "conv-order",
+      title: "同时间消息",
+      createdAt,
+      updatedAt: createdAt,
+    });
+    await repository.upsertMessage({
+      id: "assistant-order",
+      conversationId: "conv-order",
+      role: "assistant",
+      status: "completed",
+      prompt: "同一毫秒内的提示词",
+      assetId: "asset-order",
+      createdAt,
+      updatedAt: createdAt,
+    });
+    await repository.upsertMessage({
+      id: "user-order",
+      conversationId: "conv-order",
+      role: "user",
+      status: "completed",
+      prompt: "同一毫秒内的提示词",
+      createdAt,
+      updatedAt: createdAt,
+    });
+
+    await expect(repository.getConversationDetail("conv-order")).resolves.toMatchObject({
+      messages: [
+        {
+          id: "user-order",
+          role: "user",
+        },
+        {
+          id: "assistant-order",
+          role: "assistant",
+        },
+      ],
+    });
+  });
+
   it("loads assets referenced by multiple reference asset ids", async () => {
     const repository = createImageChatRepository("image-chat-test-reference-assets");
 
