@@ -158,18 +158,24 @@ export function ChatComposer({
             }
           }}
         />
-        <div className="flex items-center justify-between gap-3">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col-reverse gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <p className="w-full text-xs leading-5 text-muted-foreground lg:w-auto lg:text-sm">
             {canSubmit
               ? (
                   <>
                     支持中文自然语言提示词。按{" "}
                     <span className="font-medium">⌘ / Ctrl + Enter</span> 快速发送。
                   </>
-                )
+              )
               : disabledHint ?? "请先填写并准备好调用配置后再发送。"}
           </p>
-          <div className="flex shrink-0 flex-wrap justify-end gap-2">
+          <div
+            className={
+              onUploadReferenceImages
+                ? "grid w-full shrink-0 grid-cols-2 gap-2 lg:flex lg:w-auto lg:flex-nowrap lg:justify-end"
+                : "flex w-full shrink-0 justify-end gap-2 lg:w-auto"
+            }
+          >
             {onUploadReferenceImages ? (
               <>
                 <input
@@ -188,7 +194,11 @@ export function ChatComposer({
                 <Button
                   asChild
                   variant="outline"
-                  className={!canUploadMoreReferences ? "pointer-events-none opacity-50" : ""}
+                  className={
+                    !canUploadMoreReferences
+                      ? "pointer-events-none w-full opacity-50 lg:w-auto"
+                      : "w-full lg:w-auto"
+                  }
                 >
                   <label
                     htmlFor={uploadInputId}
@@ -204,7 +214,7 @@ export function ChatComposer({
               type="button"
               onClick={() => void handleSubmit()}
               disabled={!normalizedValue || isSubmitting || !canSubmit}
-              className="min-w-32"
+              className="w-full lg:min-w-32 lg:w-auto"
             >
               {isSubmitting ? (
                 <>

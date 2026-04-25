@@ -73,4 +73,50 @@ describe("ChatComposer", () => {
 
     expect(onUploadReferenceImages).toHaveBeenCalledWith(files);
   });
+
+  it("uses a mobile-friendly footer layout for action buttons and helper text", () => {
+    const { container } = render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={vi.fn()}
+      />
+    );
+
+    const helperText = screen.getByText(/支持中文自然语言提示词/);
+    const footer = helperText.parentElement;
+    const actions = screen.getByRole("button", { name: "发送生成" }).parentElement;
+
+    expect(footer).toHaveClass("flex-col-reverse");
+    expect(footer).toHaveClass("lg:flex-row");
+    expect(helperText).toHaveClass("w-full");
+    expect(helperText).toHaveClass("text-xs");
+    expect(actions).toHaveClass("grid");
+    expect(actions).toHaveClass("grid-cols-2");
+    expect(container.querySelector("label[for]")).toHaveClass("w-full");
+  });
+
+  it("keeps footer actions in one horizontal row on desktop", () => {
+    const { container } = render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={vi.fn()}
+      />
+    );
+
+    const helperText = screen.getByText(/支持中文自然语言提示词/);
+    const footer = helperText.parentElement;
+    const actions = screen.getByRole("button", { name: "发送生成" }).parentElement;
+    const uploadLabel = container.querySelector("label[for]");
+
+    expect(footer).toHaveClass("lg:flex-row");
+    expect(footer).toHaveClass("lg:items-center");
+    expect(actions).toHaveClass("lg:flex");
+    expect(actions).toHaveClass("lg:flex-nowrap");
+    expect(actions).toHaveClass("lg:w-auto");
+    expect(uploadLabel).toHaveClass("lg:w-auto");
+  });
 });
