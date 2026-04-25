@@ -1147,6 +1147,12 @@ export function useImageChat() {
       );
 
       await syncConversationState(conversationId);
+      if (
+        explicitReferenceAssetIds.length === 0 &&
+        selectedReferenceImages.length > 0
+      ) {
+        clearReferenceImage();
+      }
 
       try {
         const task = await createImageGenerationTask(
@@ -1229,6 +1235,7 @@ export function useImageChat() {
       activeConversation?.conversation,
       activeConversation?.assets,
       activeConversationId,
+      clearReferenceImage,
       connectionConfig,
       isSubmitting,
       pollTaskUntilSettled,
