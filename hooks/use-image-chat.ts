@@ -173,29 +173,16 @@ export function useImageChat() {
   const [selectedReferenceImage, setSelectedReferenceImage] =
     useState<ComposerReferenceImage | null>(null);
   const [settings, setSettings] = useState<GenerationSettings>(() => {
-    const savedSettings = getStorageValue(GENERATION_SETTINGS_STORAGE_KEY);
-
-    if (!savedSettings) {
-      return DEFAULT_GENERATION_SETTINGS;
-    }
-
-    try {
-      const parsed = JSON.parse(savedSettings) as GenerationSettings;
-
-      return {
-        ...DEFAULT_GENERATION_SETTINGS,
-        ...parsed,
-      };
-    } catch {
-      return DEFAULT_GENERATION_SETTINGS;
-    }
+    return DEFAULT_GENERATION_SETTINGS;
   });
   const [rememberProviderConfig, setRememberProviderConfig] = useState(
-    () => loadPersistedProviderConfigPreference().remember
+    false
   );
   const [connectionConfig, setConnectionConfig] = useState<ProviderConnectionConfig>(
-    () => loadPersistedProviderConfigPreference().config
+    DEFAULT_PROVIDER_CONNECTION_CONFIG
   );
+  const [hasLoadedBrowserPreferences, setHasLoadedBrowserPreferences] =
+    useState(false);
   const [publicKeyResponse, setPublicKeyResponse] =
     useState<PublicKeyResponse | null>(null);
   const [publicKeyStatus, setPublicKeyStatus] = useState<
@@ -698,6 +685,45 @@ export function useImageChat() {
   ]);
 
   useEffect(() => {
+    let isCancelled = false;
+
+    queueMicrotask(() => {
+      if (isCancelled) {
+        return;
+      }
+
+      const savedSettings = getStorageValue(GENERATION_SETTINGS_STORAGE_KEY);
+
+      if (savedSettings) {
+        try {
+          const parsed = JSON.parse(savedSettings) as GenerationSettings;
+
+          setSettings({
+            ...DEFAULT_GENERATION_SETTINGS,
+            ...parsed,
+          });
+        } catch {
+          setSettings(DEFAULT_GENERATION_SETTINGS);
+        }
+      }
+
+      const persistedProviderPreference = loadPersistedProviderConfigPreference();
+
+      setRememberProviderConfig(persistedProviderPreference.remember);
+      setConnectionConfig(persistedProviderPreference.config);
+      setHasLoadedBrowserPreferences(true);
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedBrowserPreferences) {
+      return;
+    }
+
     if (rememberProviderConfig) {
       persistProviderConfigPreference({
         remember: true,
@@ -707,7 +733,7 @@ export function useImageChat() {
     }
 
     clearPersistedProviderConfig();
-  }, [connectionConfig, rememberProviderConfig]);
+  }, [connectionConfig, hasLoadedBrowserPreferences, rememberProviderConfig]);
 
   const updateSettings = useCallback((nextSettings: GenerationSettings) => {
     setSettings(nextSettings);
