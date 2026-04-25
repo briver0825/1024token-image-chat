@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -84,8 +84,7 @@ describe("ConversationListItem", () => {
     expect(selectButton).not.toHaveClass("shrink-0");
   });
 
-  it("supports deleting a conversation without triggering selection", async () => {
-    const user = userEvent.setup();
+  it("supports deleting a conversation from the right-click menu without triggering selection", async () => {
     const onSelect = vi.fn();
     const onTogglePinned = vi.fn();
     const onDelete = vi.fn();
@@ -106,18 +105,19 @@ describe("ConversationListItem", () => {
       />
     );
 
-    await user.click(
-      screen.getByRole("button", { name: "会话操作 未来感城市夜景" })
-    );
-    await user.click(screen.getByRole("menuitem", { name: "删除会话" }));
+    expect(
+      screen.queryByRole("button", { name: "会话操作 未来感城市夜景" })
+    ).not.toBeInTheDocument();
+
+    fireEvent.contextMenu(screen.getByRole("button", { name: "未来感城市夜景" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "删除会话" }));
 
     expect(onDelete).toHaveBeenCalledWith("conv-2");
     expect(onTogglePinned).not.toHaveBeenCalled();
     expect(onSelect).not.toHaveBeenCalled();
   });
 
-  it("supports pinning a conversation without triggering selection", async () => {
-    const user = userEvent.setup();
+  it("supports pinning a conversation from the right-click menu without triggering selection", async () => {
     const onSelect = vi.fn();
     const onTogglePinned = vi.fn();
 
@@ -138,15 +138,14 @@ describe("ConversationListItem", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "会话操作 插画灵感板" }));
-    await user.click(screen.getByRole("menuitem", { name: "置顶会话" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "插画灵感板" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "置顶会话" }));
 
     expect(onTogglePinned).toHaveBeenCalledWith("conv-3", true);
     expect(onSelect).not.toHaveBeenCalled();
   });
 
   it("shows unpin action for pinned conversations", async () => {
-    const user = userEvent.setup();
     const onSelect = vi.fn();
     const onTogglePinned = vi.fn();
 
@@ -167,8 +166,8 @@ describe("ConversationListItem", () => {
       />
     );
 
-    await user.click(screen.getByRole("button", { name: "会话操作 品牌海报" }));
-    await user.click(screen.getByRole("menuitem", { name: "取消置顶" }));
+    fireEvent.contextMenu(screen.getByRole("button", { name: "品牌海报" }));
+    await userEvent.click(await screen.findByRole("menuitem", { name: "取消置顶" }));
 
     expect(onTogglePinned).toHaveBeenCalledWith("conv-4", false);
     expect(onSelect).not.toHaveBeenCalled();
