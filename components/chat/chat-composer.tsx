@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { ImagePlusIcon, Loader2Icon, SparklesIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ClipboardEvent } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,6 +98,24 @@ export function ChatComposer({
     void onUploadReferenceImages(nextFiles);
   }
 
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    if (!onUploadReferenceImages) {
+      return;
+    }
+
+    const pastedImageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+
+    if (pastedImageFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void onUploadReferenceImages(pastedImageFiles);
+  }
+
   function handleClearReferences() {
     if (onClearReferences) {
       onClearReferences();
@@ -171,6 +189,7 @@ export function ChatComposer({
         <Textarea
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onPaste={handlePaste}
           placeholder="描述你想生成的画面..."
           className="min-h-32 resize-none border-border/60 bg-background/70 text-base"
           onKeyDown={(event) => {

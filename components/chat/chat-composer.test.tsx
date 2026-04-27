@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -97,6 +97,81 @@ describe("ChatComposer", () => {
     await user.upload(screen.getByLabelText("上传参考图"), files);
 
     expect(onUploadReferenceImages).toHaveBeenCalledWith(files);
+  });
+
+  it("adds pasted image files as reference images", () => {
+    const onUploadReferenceImages = vi.fn();
+    const imageFile = new File(["pasted"], "clipboard.png", {
+      type: "image/png",
+    });
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={onUploadReferenceImages}
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText("描述你想生成的画面...");
+    const pasteEvent = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => imageFile,
+          },
+        ],
+      },
+    });
+
+    fireEvent(promptInput, pasteEvent);
+
+    expect(onUploadReferenceImages).toHaveBeenCalledWith([imageFile]);
+    expect(pasteEvent.defaultPrevented).toBe(true);
+  });
+
+  it("keeps default paste behavior for text-only clipboard content", () => {
+    const onUploadReferenceImages = vi.fn();
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={onUploadReferenceImages}
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText("描述你想生成的画面...");
+    const pasteEvent = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            kind: "string",
+            type: "text/plain",
+            getAsFile: () => null,
+          },
+        ],
+      },
+    });
+
+    fireEvent(promptInput, pasteEvent);
+
+    expect(onUploadReferenceImages).not.toHaveBeenCalled();
+    expect(pasteEvent.defaultPrevented).toBe(false);
   });
 
   it("uses a mobile-friendly footer layout for action buttons and helper text", () => {
