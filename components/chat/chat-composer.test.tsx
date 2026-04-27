@@ -1,6 +1,20 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+
+const referenceLightboxState = vi.hoisted(() => ({
+  lastProps: null as null | Record<string, unknown>,
+}));
+
+vi.mock("yet-another-react-lightbox", () => ({
+  default: (props: Record<string, unknown>) => {
+    referenceLightboxState.lastProps = props;
+
+    return props.open ? (
+      <div data-testid="reference-lightbox">reference-lightbox-open</div>
+    ) : null;
+  },
+}));
 
 import { ChatComposer } from "@/components/chat/chat-composer";
 
@@ -97,6 +111,169 @@ describe("ChatComposer", () => {
     await user.upload(screen.getByLabelText("上传参考图"), files);
 
     expect(onUploadReferenceImages).toHaveBeenCalledWith(files);
+  });
+
+  it("opens pasted and uploaded reference images in a lightbox preview", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[
+          {
+            id: "ref-1",
+            prompt: "夜色里的机械猫",
+            image: {
+              src: "data:image/png;base64,cmVmMQ==",
+              mimeType: "image/png",
+              width: 1024,
+              height: 1024,
+            },
+          },
+          {
+            id: "ref-2",
+            prompt: "雨夜玻璃橱窗",
+            image: {
+              src: "data:image/webp;base64,cmVmMg==",
+              mimeType: "image/webp",
+              width: 1536,
+              height: 1024,
+            },
+          },
+        ]}
+        onUploadReferenceImages={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "预览参考图 2" }));
+
+    expect(screen.getByTestId("reference-lightbox")).toBeInTheDocument();
+    expect(referenceLightboxState.lastProps?.index).toBe(1);
+    expect(referenceLightboxState.lastProps?.plugins).toHaveLength(1);
+    expect(referenceLightboxState.lastProps?.zoom).toMatchObject({
+      scrollToZoom: true,
+    });
+    expect(referenceLightboxState.lastProps?.slides).toEqual([
+      {
+        src: "data:image/png;base64,cmVmMQ==",
+        alt: "夜色里的机械猫",
+        width: 1024,
+        height: 1024,
+      },
+      {
+        src: "data:image/webp;base64,cmVmMg==",
+        alt: "雨夜玻璃橱窗",
+        width: 1536,
+        height: 1024,
+      },
+    ]);
+  });
+
+  it("does not open reference image preview when removing a reference", async () => {
+    const user = userEvent.setup();
+    const onRemoveReference = vi.fn();
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[
+          {
+            id: "ref-1",
+            prompt: "夜色里的机械猫",
+            image: {
+              src: "data:image/png;base64,cmVmMQ==",
+              mimeType: "image/png",
+              width: 1024,
+              height: 1024,
+            },
+          },
+        ]}
+        onRemoveReference={onRemoveReference}
+        onUploadReferenceImages={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "移除参考图 1" }));
+
+    expect(onRemoveReference).toHaveBeenCalledWith("ref-1");
+    expect(screen.queryByTestId("reference-lightbox")).not.toBeInTheDocument();
+  });
+
+  it("adds pasted image files as reference images", () => {
+    const onUploadReferenceImages = vi.fn();
+    const imageFile = new File(["pasted"], "clipboard.png", {
+      type: "image/png",
+    });
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={onUploadReferenceImages}
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText("描述你想生成的画面...");
+    const pasteEvent = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            kind: "file",
+            type: "image/png",
+            getAsFile: () => imageFile,
+          },
+        ],
+      },
+    });
+
+    fireEvent(promptInput, pasteEvent);
+
+    expect(onUploadReferenceImages).toHaveBeenCalledWith([imageFile]);
+    expect(pasteEvent.defaultPrevented).toBe(true);
+  });
+
+  it("keeps default paste behavior for text-only clipboard content", () => {
+    const onUploadReferenceImages = vi.fn();
+
+    render(
+      <ChatComposer
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        referenceImages={[]}
+        onUploadReferenceImages={onUploadReferenceImages}
+      />
+    );
+
+    const promptInput = screen.getByPlaceholderText("描述你想生成的画面...");
+    const pasteEvent = new Event("paste", {
+      bubbles: true,
+      cancelable: true,
+    });
+
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [
+          {
+            kind: "string",
+            type: "text/plain",
+            getAsFile: () => null,
+          },
+        ],
+      },
+    });
+
+    fireEvent(promptInput, pasteEvent);
+
+    expect(onUploadReferenceImages).not.toHaveBeenCalled();
+    expect(pasteEvent.defaultPrevented).toBe(false);
   });
 
   it("uses a mobile-friendly footer layout for action buttons and helper text", () => {

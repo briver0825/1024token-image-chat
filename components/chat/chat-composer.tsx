@@ -2,8 +2,22 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { ImagePlusIcon, Loader2Icon, SparklesIcon, XIcon } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import {
+  ImagePlusIcon,
+  Loader2Icon,
+  Maximize2Icon,
+  SparklesIcon,
+  XIcon,
+} from "lucide-react";
+import {
+  useEffect,
+  useId,
+  useMemo,
+  useState,
+  type ClipboardEvent,
+} from "react";
+import Lightbox from "yet-another-react-lightbox";
+import Zoom from "yet-another-react-lightbox/plugins/zoom";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -52,14 +66,29 @@ export function ChatComposer({
   onSubmit,
 }: ChatComposerProps) {
   const [value, setValue] = useState("");
+  const [previewIndex, setPreviewIndex] = useState(-1);
   const uploadInputId = useId();
   const normalizedValue = value.trim();
-  const selectedReferenceImages =
-    referenceImages ?? (referenceImage ? [referenceImage] : []);
+  const selectedReferenceImages = useMemo(
+    () => referenceImages ?? (referenceImage ? [referenceImage] : []),
+    [referenceImage, referenceImages]
+  );
   const hasReferenceImages = selectedReferenceImages.length > 0;
   const canUploadMoreReferences =
     Boolean(onUploadReferenceImages) &&
     selectedReferenceImages.length < MAX_REFERENCE_IMAGES;
+  const referencePreviewSlides = useMemo(
+    () =>
+      selectedReferenceImages.map((item) => ({
+        src: item.image.src,
+        alt: item.prompt,
+        width: item.image.width,
+        height: item.image.height,
+      })),
+    [selectedReferenceImages]
+  );
+  const isReferencePreviewOpen =
+    previewIndex >= 0 && previewIndex < referencePreviewSlides.length;
 
   useEffect(() => {
     if (draftPrompt === undefined) {
@@ -98,6 +127,24 @@ export function ChatComposer({
     void onUploadReferenceImages(nextFiles);
   }
 
+  function handlePaste(event: ClipboardEvent<HTMLTextAreaElement>) {
+    if (!onUploadReferenceImages) {
+      return;
+    }
+
+    const pastedImageFiles = Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => Boolean(file));
+
+    if (pastedImageFiles.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    void onUploadReferenceImages(pastedImageFiles);
+  }
+
   function handleClearReferences() {
     if (onClearReferences) {
       onClearReferences();
@@ -108,6 +155,7 @@ export function ChatComposer({
   }
 
   return (
+    <>
     <Card className="border-border/60 bg-card/80 p-4 shadow-lg shadow-black/10 backdrop-blur">
       <div className="space-y-3">
         {hasReferenceImages ? (
@@ -139,18 +187,30 @@ export function ChatComposer({
               {selectedReferenceImages.map((item, index) => (
                 <div
                   key={item.id}
-                  className="group relative flex items-start gap-2 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-2"
+                  className="group relative overflow-hidden rounded-xl border border-border/60 bg-background/70"
                 >
-                  <img
-                    src={item.image.src}
-                    alt={`参考图 ${index + 1}`}
-                    width={item.image.width}
-                    height={item.image.height}
-                    className="h-14 w-14 shrink-0 rounded-lg object-cover"
-                  />
-                  <p className="line-clamp-2 min-w-0 pr-6 text-xs leading-5 text-foreground">
-                    {item.prompt}
-                  </p>
+                  <button
+                    type="button"
+                    aria-label={`预览参考图 ${index + 1}`}
+                    onClick={() => setPreviewIndex(index)}
+                    className="flex w-full items-start gap-2 p-2 pr-10 text-left outline-none transition hover:bg-accent/30 focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <span className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg">
+                      <img
+                        src={item.image.src}
+                        alt={`参考图 ${index + 1}`}
+                        width={item.image.width}
+                        height={item.image.height}
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/35 text-white opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+                        <Maximize2Icon className="size-4" />
+                      </span>
+                    </span>
+                    <p className="line-clamp-2 min-w-0 text-xs leading-5 text-foreground">
+                      {item.prompt}
+                    </p>
+                  </button>
                   {onRemoveReference ? (
                     <Button
                       type="button"
@@ -171,6 +231,7 @@ export function ChatComposer({
         <Textarea
           value={value}
           onChange={(event) => setValue(event.target.value)}
+          onPaste={handlePaste}
           placeholder="描述你想生成的画面..."
           className="min-h-32 resize-none border-border/60 bg-background/70 text-base"
           onKeyDown={(event) => {
@@ -254,5 +315,53 @@ export function ChatComposer({
         </div>
       </div>
     </Card>
+
+    <Lightbox
+      open={isReferencePreviewOpen}
+      close={() => setPreviewIndex(-1)}
+      index={isReferencePreviewOpen ? previewIndex : 0}
+      plugins={[Zoom]}
+      zoom={{
+        scrollToZoom: true,
+        maxZoomPixelRatio: 3,
+      }}
+      slides={referencePreviewSlides}
+      carousel={{
+        finite: true,
+        padding: "48px",
+        spacing: "24px",
+        imageFit: "contain",
+      }}
+      render={{
+        buttonClose: () => (
+          <button
+            type="button"
+            className="yarl__button"
+            aria-label="关闭预览"
+            title="关闭预览"
+            onClick={() => setPreviewIndex(-1)}
+          >
+            <XIcon className="size-6" />
+          </button>
+        ),
+      }}
+      labels={{
+        Close: "关闭预览",
+        Lightbox: "参考图预览",
+        "Photo gallery": "参考图预览",
+        "Zoom in": "放大",
+        "Zoom out": "缩小",
+      }}
+      styles={{
+        container: {
+          backgroundColor: "rgba(6, 7, 12, 0.96)",
+          backdropFilter: "blur(12px)",
+        },
+        button: {
+          filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.45))",
+        },
+      }}
+    />
+    </>
   );
 }
