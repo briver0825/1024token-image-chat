@@ -1,11 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { isValidElement } from "react";
+import { isValidElement, type ReactElement } from "react";
 import { describe, expect, it, vi } from "vitest";
 
 const lightboxState = vi.hoisted(() => ({
   lastProps: null as null | Record<string, unknown>,
 }));
+
+type LightboxToolbarButtonElement = ReactElement<{ label: string }>;
+
+function isLightboxToolbarButtonElement(
+  button: unknown
+): button is LightboxToolbarButtonElement {
+  return isValidElement<{ label?: unknown }>(button) && typeof button.props.label === "string";
+}
 
 vi.mock("yet-another-react-lightbox", () => ({
   default: (props: Record<string, unknown>) => {
@@ -105,7 +113,7 @@ describe("ImageMessageCard", () => {
     )?.buttons;
     const customButtonLabels =
       toolbarButtons
-        ?.filter((button) => isValidElement(button))
+        ?.filter(isLightboxToolbarButtonElement)
         .map((button) => button.props.label) ?? [];
 
     expect(customButtonLabels).not.toContain("重新生成");
@@ -200,5 +208,43 @@ describe("ImageMessageCard", () => {
 
     expect(screen.getByText("参考图续画")).toBeInTheDocument();
     expect(screen.getByText("本次生成会参考这张图继续延展。")).toBeInTheDocument();
+  });
+
+  it("shows long generation errors without line clamping", () => {
+    const longErrorMessage = [
+      "Provider returned validation details.",
+      "request_id=req_long_error",
+      "upstream trace ".repeat(120),
+      "final actionable detail",
+    ].join("\n");
+
+    render(
+      <ImageMessageCard
+        message={{
+          id: "assistant-failed",
+          prompt: "生成失败的提示词",
+          createdAt: "2026-04-23T12:00:00.000Z",
+          status: "failed",
+          errorMessage: longErrorMessage,
+        }}
+        onCopyPrompt={vi.fn()}
+        onDownload={vi.fn()}
+        onRegenerate={vi.fn()}
+        onUseAsReference={vi.fn()}
+      />
+    );
+
+    const errorMessage = screen
+      .getByText((content) => content.includes("request_id=req_long_error"))
+      .closest('[data-slot="alert-description"]');
+
+    expect(errorMessage).not.toBeNull();
+    expect(errorMessage!).toHaveTextContent("final actionable detail");
+    expect(errorMessage!).toHaveClass("max-h-72");
+    expect(errorMessage!).toHaveClass("overflow-auto");
+    expect(errorMessage!).toHaveClass("whitespace-pre-wrap");
+    expect(errorMessage!).not.toHaveClass("line-clamp-1");
+    expect(errorMessage!).not.toHaveClass("line-clamp-2");
+    expect(errorMessage!).not.toHaveClass("line-clamp-3");
   });
 });

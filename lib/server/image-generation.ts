@@ -15,7 +15,6 @@ import {
 
 const DEFAULT_PROVIDER_TIMEOUT_MS = 180_000;
 const MIN_PROVIDER_TIMEOUT_MS = 1_000;
-const MAX_PROVIDER_ERROR_MESSAGE_LENGTH = 800;
 
 const referenceImageSchema = z.object({
   b64: z.string().transform((value) => value.trim()),
@@ -105,13 +104,7 @@ export class ProviderHttpError extends Error {
 }
 
 function compactErrorMessage(message: string) {
-  const normalized = message.replace(/\s+/g, " ").trim();
-
-  if (normalized.length <= MAX_PROVIDER_ERROR_MESSAGE_LENGTH) {
-    return normalized;
-  }
-
-  return `${normalized.slice(0, MAX_PROVIDER_ERROR_MESSAGE_LENGTH)}…`;
+  return message.trim();
 }
 
 function extractStringField(

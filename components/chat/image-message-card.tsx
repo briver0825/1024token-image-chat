@@ -263,7 +263,7 @@ export function ImageMessageCard({
           <Alert variant="destructive">
             <TriangleAlertIcon className="size-4" />
             <AlertTitle>图片没有生成成功</AlertTitle>
-            <AlertDescription>
+            <AlertDescription className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md pr-2 font-mono text-xs leading-5">
               {message.errorMessage ?? "请调整提示词或稍后重试。"}
             </AlertDescription>
           </Alert>

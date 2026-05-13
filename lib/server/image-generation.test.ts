@@ -8,8 +8,8 @@ import {
   parseGenerateRequest,
   parseProviderResponse,
   resolveProviderTimeoutMs,
-  type GenerateRequest,
 } from "@/lib/server/image-generation";
+import type { GenerateRequest } from "@/lib/image-chat/types";
 
 const validRequest: GenerateRequest = {
   prompt: "一只坐在霓虹雨夜里的黑猫",
@@ -157,6 +157,28 @@ describe("normalizeProviderError", () => {
       error: {
         code: "provider_unavailable",
         message: "图片服务暂时不可用：fetch failed: connect ECONNREFUSED",
+      },
+    });
+  });
+
+  it("does not truncate long provider error messages", async () => {
+    const providerMessage = [
+      "Provider returned a detailed diagnostic:",
+      "request_id=req_123",
+      "upstream trace=".repeat(120),
+      "final actionable detail",
+    ].join("\n");
+    const error = new ProviderHttpError(500, {
+      error: {
+        message: providerMessage,
+      },
+    });
+
+    await expect(normalizeProviderError(error)).resolves.toEqual({
+      status: 502,
+      error: {
+        code: "provider_unavailable",
+        message: `图片服务暂时不可用：${providerMessage}`,
       },
     });
   });
