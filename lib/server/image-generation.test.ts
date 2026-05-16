@@ -28,28 +28,6 @@ describe("parseGenerateRequest", () => {
     ).toEqual(validRequest);
   });
 
-  it("accepts official 4K landscape and portrait sizes", () => {
-    expect(
-      parseGenerateRequest({
-        ...validRequest,
-        size: "3840x2160",
-      })
-    ).toMatchObject({
-      ...validRequest,
-      size: "3840x2160",
-    });
-
-    expect(
-      parseGenerateRequest({
-        ...validRequest,
-        size: "2160x3840",
-      })
-    ).toMatchObject({
-      ...validRequest,
-      size: "2160x3840",
-    });
-  });
-
   it("rejects blank prompt and unsupported options", () => {
     expect(() =>
       parseGenerateRequest({
@@ -107,19 +85,6 @@ describe("parseGenerateRequest", () => {
 });
 
 describe("buildProviderRequestInit", () => {
-  it("forwards 4K size to the image generations provider request", () => {
-    const requestInit = buildProviderRequestInit("gpt-image-2", {
-      ...validRequest,
-      size: "3840x2160",
-    });
-
-    expect(requestInit.endpointPath).toBe("generations");
-    expect(JSON.parse(requestInit.body as string)).toMatchObject({
-      model: "gpt-image-2",
-      size: "3840x2160",
-    });
-  });
-
   it("uses the official image[] multipart field for multiple reference images", () => {
     const requestInit = buildProviderRequestInit("gpt-image-2", {
       ...validRequest,

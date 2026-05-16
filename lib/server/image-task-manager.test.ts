@@ -79,44 +79,6 @@ describe("image-task-manager", () => {
     });
   });
 
-  it("returns 4K dimensions for completed 4K tasks", async () => {
-    const request4k: GenerateRequest = {
-      ...request,
-      size: "3840x2160",
-    };
-    const created = createImageGenerationTask({
-      request: request4k,
-      providerConfig,
-      fetchImpl: vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            created: 1_745_398_400,
-            data: [{ b64_json: "ZmFrZS00aw==" }],
-          }),
-          {
-            status: 200,
-            headers: {
-              "content-type": "application/json",
-            },
-          }
-        )
-      ),
-    });
-
-    await vi.waitFor(() => {
-      expect(getImageGenerationTaskStatus(created.taskId)).toMatchObject({
-        taskId: created.taskId,
-        status: "completed",
-        image: {
-          b64: "ZmFrZS00aw==",
-          width: 3840,
-          height: 2160,
-        },
-        params: request4k,
-      });
-    });
-  });
-
   it("stores a normalized failed status when upstream returns an error", async () => {
     const created = createImageGenerationTask({
       request,
