@@ -12,8 +12,8 @@ import {
 const baseInput = {
   prompt: "霓虹雨夜中的机械猫",
   settings: {
-    aspectRatio: "1:1",
-    resolution: "1k",
+    size: "1024x1024",
+    quality: "high",
     outputFormat: "png",
   },
   model: "gpt-image-2",

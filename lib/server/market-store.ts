@@ -4,8 +4,14 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-import { normalizeGenerationSettings } from "@/lib/image-chat/generation-settings";
-import type { GenerationSettings, MarketItemRecord } from "@/lib/image-chat/types";
+import {
+  IMAGE_OUTPUT_FORMAT_OPTIONS,
+  IMAGE_QUALITY_OPTIONS,
+  IMAGE_SIZE_OPTIONS,
+  type GenerationSettings,
+  type ImageOutputFormat,
+  type MarketItemRecord,
+} from "@/lib/image-chat/types";
 import { createUuid } from "@/lib/shared/uuid";
 
 function getDefaultMarketDataDir() {
@@ -84,7 +90,22 @@ function isMarketItemRow(row: unknown): row is MarketItemRow {
 function parseSettings(settingsJson: string): GenerationSettings {
   const parsed = JSON.parse(settingsJson) as Partial<GenerationSettings>;
 
-  return normalizeGenerationSettings(parsed);
+  return {
+    size: IMAGE_SIZE_OPTIONS.includes(parsed.size as never)
+      ? (parsed.size as GenerationSettings["size"])
+      : "1024x1024",
+    quality: IMAGE_QUALITY_OPTIONS.includes(parsed.quality as never)
+      ? (parsed.quality as GenerationSettings["quality"])
+      : "high",
+    outputFormat: IMAGE_OUTPUT_FORMAT_OPTIONS.includes(
+      parsed.outputFormat as never
+    )
+      ? (parsed.outputFormat as ImageOutputFormat)
+      : "png",
+    ...(typeof parsed.outputCompression === "number"
+      ? { outputCompression: parsed.outputCompression }
+      : {}),
+  };
 }
 
 function mapMarketItemRow(row: MarketItemRow): MarketItemRecord {

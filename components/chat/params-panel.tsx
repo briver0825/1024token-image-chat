@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  RectangleHorizontalIcon,
-  RectangleVerticalIcon,
-  SlidersHorizontalIcon,
-  SquareIcon,
-} from "lucide-react";
+import { SlidersHorizontalIcon } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
 import {
@@ -15,74 +10,35 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { normalizeGenerationSettings } from "@/lib/image-chat/generation-settings";
-import type {
-  GenerationSettings,
-  ImageAspectRatio,
-  ImageResolution,
-} from "@/lib/image-chat/types";
+import type { GenerationSettings } from "@/lib/image-chat/types";
+
+export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
+  size: "1024x1024",
+  quality: "high",
+  outputFormat: "png",
+};
 
 type ParamsPanelProps = {
   value: GenerationSettings;
   onChange: (settings: GenerationSettings) => void;
 };
 
-const ASPECT_RATIO_OPTIONS: Array<{
-  value: ImageAspectRatio;
-  label: string;
-  icon: typeof RectangleHorizontalIcon;
-}> = [
-  {
-    value: "16:9",
-    label: "16:9",
-    icon: RectangleHorizontalIcon,
-  },
-  {
-    value: "4:3",
-    label: "4:3",
-    icon: RectangleHorizontalIcon,
-  },
-  {
-    value: "1:1",
-    label: "1:1",
-    icon: SquareIcon,
-  },
-  {
-    value: "3:4",
-    label: "3:4",
-    icon: RectangleVerticalIcon,
-  },
-  {
-    value: "9:16",
-    label: "9:16",
-    icon: RectangleVerticalIcon,
-  },
-];
+function normalizeSettings(nextSettings: GenerationSettings): GenerationSettings {
+  if (nextSettings.outputFormat === "png") {
+    const rest = { ...nextSettings };
+    delete rest.outputCompression;
+    return rest;
+  }
 
-const RESOLUTION_OPTIONS: Array<{
-  value: ImageResolution;
-  label: string;
-}> = [
-  {
-    value: "1k",
-    label: "1K",
-  },
-  {
-    value: "2k",
-    label: "2K",
-  },
-  {
-    value: "4k",
-    label: "4K",
-  },
-];
+  return nextSettings;
+}
 
 export function ParamsPanel({ value, onChange }: ParamsPanelProps) {
-  const normalizedValue = normalizeGenerationSettings(value);
+  const normalizedValue = normalizeSettings(value);
 
   function patchSettings(patch: Partial<GenerationSettings>) {
     onChange(
-      normalizeGenerationSettings({
+      normalizeSettings({
         ...normalizedValue,
         ...patch,
       })
@@ -98,75 +54,55 @@ export function ParamsPanel({ value, onChange }: ParamsPanelProps) {
             生成参数
           </div>
           <p className="text-sm text-muted-foreground">
-            调整比例、输出规格与图片格式，新的生成请求会立即使用这些参数。
+            调整尺寸、质量与输出格式，新的生成请求会立即使用这些参数。
           </p>
         </div>
 
         <div className="space-y-4">
           <div className="space-y-2">
-            <div className="text-sm font-medium">图片比例</div>
-            <div
-              role="radiogroup"
-              aria-label="图片比例"
-              className="grid grid-cols-5 gap-1 rounded-2xl border border-border/60 bg-background/55 p-1"
+            <label className="text-sm font-medium">图片尺寸</label>
+            <Select
+              value={normalizedValue.size}
+              onValueChange={(nextValue) =>
+                patchSettings({
+                  size: nextValue as GenerationSettings["size"],
+                })
+              }
             >
-              {ASPECT_RATIO_OPTIONS.map((option) => {
-                const Icon = option.icon;
-                const isSelected = normalizedValue.aspectRatio === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    aria-label={option.label}
-                    onClick={() => patchSettings({ aspectRatio: option.value })}
-                    className={[
-                      "flex min-h-16 flex-col items-center justify-center gap-1 rounded-lg px-2 text-sm font-semibold transition-colors",
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    ].join(" ")}
-                  >
-                    <Icon className="size-5" />
-                    <span>{option.label}</span>
-                  </button>
-                );
-              })}
-            </div>
+              <SelectTrigger aria-label="图片尺寸" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1024x1024">1024 × 1024</SelectItem>
+                <SelectItem value="1536x1024">1536 × 1024</SelectItem>
+                <SelectItem value="1024x1536">1024 × 1536</SelectItem>
+                <SelectItem value="2048x2048">2048 × 2048</SelectItem>
+                <SelectItem value="3840x2160">3840 × 2160</SelectItem>
+                <SelectItem value="2160x3840">2160 × 3840</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
-            <div className="text-sm font-medium">输出规格</div>
-            <div
-              role="radiogroup"
-              aria-label="输出规格"
-              className="grid grid-cols-3 gap-1 rounded-2xl border border-border/60 bg-background/55 p-1"
+            <label className="text-sm font-medium">生成质量</label>
+            <Select
+              value={normalizedValue.quality}
+              onValueChange={(nextValue) =>
+                patchSettings({
+                  quality: nextValue as GenerationSettings["quality"],
+                })
+              }
             >
-              {RESOLUTION_OPTIONS.map((option) => {
-                const isSelected = normalizedValue.resolution === option.value;
-
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={isSelected}
-                    aria-label={option.label}
-                    onClick={() => patchSettings({ resolution: option.value })}
-                    className={[
-                      "h-10 rounded-lg px-3 text-sm font-semibold transition-colors",
-                      isSelected
-                        ? "bg-primary text-primary-foreground shadow-sm"
-                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
-                    ].join(" ")}
-                  >
-                    {option.label}
-                  </button>
-                );
-              })}
-            </div>
+              <SelectTrigger aria-label="生成质量" className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="auto">自动</SelectItem>
+                <SelectItem value="low">低质量</SelectItem>
+                <SelectItem value="medium">中质量</SelectItem>
+                <SelectItem value="high">高质量</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="space-y-2">
@@ -188,6 +124,32 @@ export function ParamsPanel({ value, onChange }: ParamsPanelProps) {
                 <SelectItem value="webp">WebP</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium">压缩率</label>
+              <span className="text-xs text-muted-foreground">
+                {normalizedValue.outputFormat === "png"
+                  ? "PNG 不支持压缩率"
+                  : `${normalizedValue.outputCompression ?? 80}%`}
+              </span>
+            </div>
+            <input
+              aria-label="压缩率"
+              type="range"
+              min={10}
+              max={100}
+              step={1}
+              disabled={normalizedValue.outputFormat === "png"}
+              value={normalizedValue.outputCompression ?? 80}
+              onChange={(event) =>
+                patchSettings({
+                  outputCompression: Number.parseInt(event.target.value, 10),
+                })
+              }
+              className="w-full accent-primary disabled:cursor-not-allowed disabled:opacity-50"
+            />
           </div>
         </div>
       </div>

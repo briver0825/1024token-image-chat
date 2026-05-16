@@ -1,20 +1,13 @@
 import { z } from "zod";
 
 import {
-  DEFAULT_IMAGE_QUALITY,
-  createProviderGenerationRequest,
-  resolveImageSize,
-} from "@/lib/image-chat/generation-settings";
-import {
-  IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_OUTPUT_FORMAT_OPTIONS,
   IMAGE_QUALITY_OPTIONS,
-  IMAGE_RESOLUTION_OPTIONS,
   IMAGE_SIZE_OPTIONS,
   MAX_REFERENCE_IMAGES,
   type GenerateErrorResponse,
   type GenerateRequest,
-  type ParsedGenerateTaskRequest,
+  type GenerateTaskRequest,
   type GenerateSuccessResponse,
   type ImageGenerationResult,
   type ImageOutputFormat,
@@ -31,10 +24,8 @@ const referenceImageSchema = z.object({
 const generateRequestSchema = z
   .object({
     prompt: z.string().transform((value) => value.trim()),
-    aspectRatio: z.enum(IMAGE_ASPECT_RATIO_OPTIONS).optional(),
-    resolution: z.enum(IMAGE_RESOLUTION_OPTIONS).optional(),
-    size: z.enum(IMAGE_SIZE_OPTIONS).optional(),
-    quality: z.enum(IMAGE_QUALITY_OPTIONS).optional(),
+    size: z.enum(IMAGE_SIZE_OPTIONS),
+    quality: z.enum(IMAGE_QUALITY_OPTIONS),
     outputFormat: z.enum(IMAGE_OUTPUT_FORMAT_OPTIONS),
     outputCompression: z.number().int().min(0).max(100).optional(),
     referenceImage: referenceImageSchema.optional(),
@@ -49,19 +40,11 @@ const generateRequestSchema = z
       });
     }
 
-    if (!value.aspectRatio && !value.size) {
+    if (value.outputFormat === "png" && value.outputCompression !== undefined) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "aspectRatio 不能为空",
-        path: ["aspectRatio"],
-      });
-    }
-
-    if (!value.resolution && !value.size) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "resolution 不能为空",
-        path: ["resolution"],
+        message: "compression 仅支持 jpeg/webp",
+        path: ["outputCompression"],
       });
     }
 
@@ -185,7 +168,7 @@ function createProviderUnavailableMessage(reason?: string) {
   return `图片服务暂时不可用：${normalizedReason}`;
 }
 
-export function parseGenerateRequest(input: unknown): ParsedGenerateTaskRequest {
+export function parseGenerateRequest(input: unknown): GenerateTaskRequest {
   const result = generateRequestSchema.safeParse(input);
 
   if (!result.success) {
@@ -199,13 +182,6 @@ export function parseGenerateRequest(input: unknown): ParsedGenerateTaskRequest 
   }
 
   const parsed = result.data;
-  const providerSettings = createProviderGenerationRequest({
-    ...(parsed.size ? { size: parsed.size } : {}),
-    ...(parsed.aspectRatio ? { aspectRatio: parsed.aspectRatio } : {}),
-    ...(parsed.resolution ? { resolution: parsed.resolution } : {}),
-    outputFormat: parsed.outputFormat,
-    ...(parsed.quality ? { quality: parsed.quality } : {}),
-  });
   const referenceImages = [
     ...(parsed.referenceImage ? [parsed.referenceImage] : []),
     ...(parsed.referenceImages ?? []),
@@ -213,25 +189,27 @@ export function parseGenerateRequest(input: unknown): ParsedGenerateTaskRequest 
 
   return {
     prompt: parsed.prompt,
-    aspectRatio: providerSettings.aspectRatio,
-    resolution: providerSettings.resolution,
-    outputFormat: providerSettings.outputFormat,
-    size: providerSettings.size,
-    quality: providerSettings.quality,
+    size: parsed.size,
+    quality: parsed.quality,
+    outputFormat: parsed.outputFormat,
+    ...(parsed.outputCompression !== undefined
+      ? { outputCompression: parsed.outputCompression }
+      : {}),
     ...(referenceImages.length ? { referenceImages } : {}),
   };
 }
 
 export function stripReferenceImage(
-  request: ParsedGenerateTaskRequest
+  request: GenerateTaskRequest
 ): GenerateRequest {
   return {
     prompt: request.prompt,
-    aspectRatio: request.aspectRatio,
-    resolution: request.resolution,
-    outputFormat: request.outputFormat,
     size: request.size,
-    quality: request.quality ?? DEFAULT_IMAGE_QUALITY,
+    quality: request.quality,
+    outputFormat: request.outputFormat,
+    ...(request.outputCompression !== undefined
+      ? { outputCompression: request.outputCompression }
+      : {}),
   };
 }
 
@@ -438,9 +416,12 @@ export function buildProviderRequestBody(
   return {
     model,
     prompt: request.prompt,
-    size: request.size ?? resolveImageSize(request),
-    quality: request.quality ?? DEFAULT_IMAGE_QUALITY,
+    size: request.size,
+    quality: request.quality,
     output_format: request.outputFormat,
+    ...(request.outputCompression !== undefined
+      ? { output_compression: request.outputCompression }
+      : {}),
   };
 }
 
@@ -474,7 +455,7 @@ function mimeTypeToExtension(mimeType: string) {
 
 export function buildProviderRequestInit(
   model: string,
-  request: ParsedGenerateTaskRequest
+  request: GenerateTaskRequest
 ): {
   endpointPath: "generations" | "edits";
   headers?: HeadersInit;
@@ -500,9 +481,13 @@ export function buildProviderRequestInit(
 
   formData.set("model", model);
   formData.set("prompt", request.prompt);
-  formData.set("size", baseRequest.size);
-  formData.set("quality", baseRequest.quality);
+  formData.set("size", request.size);
+  formData.set("quality", request.quality);
   formData.set("output_format", request.outputFormat);
+
+  if (request.outputCompression !== undefined) {
+    formData.set("output_compression", String(request.outputCompression));
+  }
 
   referenceImages.forEach((referenceImage, index) => {
     formData.append(

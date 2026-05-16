@@ -44,8 +44,8 @@ const marketItem = {
   id: "market-1",
   prompt: "霓虹雨夜中的机械猫",
   settings: {
-    aspectRatio: "1:1",
-    resolution: "1k",
+    size: "1024x1024",
+    quality: "high",
     outputFormat: "png",
   },
   model: "gpt-image-2",
@@ -108,7 +108,7 @@ describe("MarketPageClient", () => {
     render(<MarketPageClient initialItems={[marketItem]} initialNextCursor={null} />);
 
     expect(screen.getByText("霓虹雨夜中的机械猫")).toBeInTheDocument();
-    expect(screen.getByText("1K · 1:1 · PNG")).toBeInTheDocument();
+    expect(screen.getByText("1024x1024 · high · png")).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "管理删除" })
     ).not.toBeInTheDocument();
@@ -144,7 +144,7 @@ describe("MarketPageClient", () => {
     expect(within(dialog).getByText("完整提示词")).toBeInTheDocument();
     expect(within(dialog).getByText("霓虹雨夜中的机械猫")).toBeInTheDocument();
     expect(within(dialog).getByText("模型：gpt-image-2")).toBeInTheDocument();
-    expect(within(dialog).getByText("1K · 1:1 · PNG")).toBeInTheDocument();
+    expect(within(dialog).getByText("1024x1024 · high · png")).toBeInTheDocument();
 
     await user.click(within(dialog).getByRole("button", { name: "复制提示词" }));
 
