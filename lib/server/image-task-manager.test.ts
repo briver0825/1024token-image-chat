@@ -12,6 +12,8 @@ import type {
 
 const request: GenerateRequest = {
   prompt: "一只站在星际港口里的机械狐狸",
+  aspectRatio: "1:1",
+  resolution: "1k",
   size: "1024x1024",
   quality: "high",
   outputFormat: "png",
@@ -82,6 +84,8 @@ describe("image-task-manager", () => {
   it("returns 4K dimensions for completed 4K tasks", async () => {
     const request4k: GenerateRequest = {
       ...request,
+      aspectRatio: "16:9",
+      resolution: "4k",
       size: "3840x2160",
     };
     const created = createImageGenerationTask({

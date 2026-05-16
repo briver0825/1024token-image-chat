@@ -17,8 +17,8 @@ const useImageChatState = vi.hoisted(() => ({
       prompt: `图片 ${index}`,
       createdAt: "2026-04-24T00:00:00.000Z",
       settings: {
-        size: "1024x1024",
-        quality: "high",
+        aspectRatio: "1:1",
+        resolution: "1k",
         outputFormat: "png",
       },
       image: {
@@ -31,8 +31,8 @@ const useImageChatState = vi.hoisted(() => ({
     selectedReferenceImage: null,
     selectedReferenceImages: [],
     settings: {
-      size: "1024x1024",
-      quality: "high",
+      aspectRatio: "1:1",
+      resolution: "1k",
       outputFormat: "png",
     },
     connectionConfig: {
@@ -138,8 +138,8 @@ describe("ImageChatShell", () => {
       JSON.stringify({
         prompt: "来自焚决市场的提示词",
         settings: {
-          size: "1536x1024",
-          quality: "medium",
+          aspectRatio: "4:3",
+          resolution: "2k",
           outputFormat: "webp",
         },
         sourceMarketItemId: "market-1",
@@ -157,8 +157,8 @@ describe("ImageChatShell", () => {
       });
     });
     expect(useImageChatState.value.updateSettings).toHaveBeenCalledWith({
-      size: "1536x1024",
-      quality: "medium",
+      aspectRatio: "4:3",
+      resolution: "2k",
       outputFormat: "webp",
     });
     expect(useImageChatState.value.startNewConversation).toHaveBeenCalledTimes(1);
@@ -198,8 +198,8 @@ describe("ImageChatShell", () => {
         createdAt: "2026-04-26T08:01:00.000Z",
         status: "completed",
         settings: {
-          size: "1024x1024",
-          quality: "high",
+          aspectRatio: "1:1",
+          resolution: "1k",
           outputFormat: "png",
         },
         image: {

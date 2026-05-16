@@ -6,9 +6,10 @@ import {
   DEFAULT_GENERATION_SETTINGS,
   ParamsPanel,
 } from "@/components/chat/params-panel";
+import { normalizeGenerationSettings } from "@/lib/image-chat/generation-settings";
 
 describe("ParamsPanel", () => {
-  it("updates image format and quality", async () => {
+  it("updates image format and resolution", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
@@ -17,18 +18,29 @@ describe("ParamsPanel", () => {
         value={DEFAULT_GENERATION_SETTINGS}
         onChange={onChange}
       />
+    );
+
+    await user.click(screen.getByRole("radio", { name: "2K" }));
+
+    expect(onChange).toHaveBeenCalledWith(
+      normalizeGenerationSettings({
+        ...DEFAULT_GENERATION_SETTINGS,
+        resolution: "2k",
+      })
     );
 
     await user.click(screen.getByRole("combobox", { name: "图片格式" }));
     await user.click(screen.getByRole("option", { name: "WebP" }));
 
-    expect(onChange).toHaveBeenCalledWith({
-      ...DEFAULT_GENERATION_SETTINGS,
-      outputFormat: "webp",
-    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      normalizeGenerationSettings({
+        ...DEFAULT_GENERATION_SETTINGS,
+        outputFormat: "webp",
+      })
+    );
   });
 
-  it("allows selecting 4K landscape and portrait sizes", async () => {
+  it("allows selecting common aspect ratios without exposing pixel sizes", async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
@@ -39,20 +51,25 @@ describe("ParamsPanel", () => {
       />
     );
 
-    await user.click(screen.getByRole("combobox", { name: "图片尺寸" }));
-    await user.click(screen.getByRole("option", { name: "3840 × 2160" }));
+    expect(screen.queryByRole("combobox", { name: "图片尺寸" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("压缩率")).not.toBeInTheDocument();
 
-    expect(onChange).toHaveBeenLastCalledWith({
-      ...DEFAULT_GENERATION_SETTINGS,
-      size: "3840x2160",
-    });
+    await user.click(screen.getByRole("radio", { name: "16:9" }));
 
-    await user.click(screen.getByRole("combobox", { name: "图片尺寸" }));
-    await user.click(screen.getByRole("option", { name: "2160 × 3840" }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      normalizeGenerationSettings({
+        ...DEFAULT_GENERATION_SETTINGS,
+        aspectRatio: "16:9",
+      })
+    );
 
-    expect(onChange).toHaveBeenLastCalledWith({
-      ...DEFAULT_GENERATION_SETTINGS,
-      size: "2160x3840",
-    });
+    await user.click(screen.getByRole("radio", { name: "9:16" }));
+
+    expect(onChange).toHaveBeenLastCalledWith(
+      normalizeGenerationSettings({
+        ...DEFAULT_GENERATION_SETTINGS,
+        aspectRatio: "9:16",
+      })
+    );
   });
 });

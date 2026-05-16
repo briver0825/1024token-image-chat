@@ -12,6 +12,10 @@ import {
 } from "@/lib/image-chat/client";
 import { computeBlobSha256 } from "@/lib/image-chat/asset-dedup";
 import {
+  DEFAULT_GENERATION_SETTINGS,
+  normalizeGenerationSettings,
+} from "@/lib/image-chat/generation-settings";
+import {
   clearPersistedProviderConfig,
   loadPersistedProviderConfigPreference,
   persistProviderConfigPreference,
@@ -113,12 +117,6 @@ export type ComposerReferenceImage = {
   };
 };
 
-export const DEFAULT_GENERATION_SETTINGS: GenerationSettings = {
-  size: "1024x1024",
-  quality: "high",
-  outputFormat: "png",
-};
-
 export const DEFAULT_PROVIDER_CONNECTION_CONFIG: ProviderConnectionConfig = {
   apiKey: "",
   baseUrl: "",
@@ -187,14 +185,7 @@ function readImageDimensions(src: string) {
 }
 
 function extractGenerationSettings(settings: Partial<GenerationSettings> | undefined) {
-  return {
-    size: settings?.size ?? DEFAULT_GENERATION_SETTINGS.size,
-    quality: settings?.quality ?? DEFAULT_GENERATION_SETTINGS.quality,
-    outputFormat: settings?.outputFormat ?? DEFAULT_GENERATION_SETTINGS.outputFormat,
-    ...(settings?.outputCompression !== undefined
-      ? { outputCompression: settings.outputCompression }
-      : {}),
-  } satisfies GenerationSettings;
+  return normalizeGenerationSettings(settings);
 }
 
 export function useImageChat() {
@@ -775,10 +766,7 @@ export function useImageChat() {
         try {
           const parsed = JSON.parse(savedSettings) as GenerationSettings;
 
-          setSettings({
-            ...DEFAULT_GENERATION_SETTINGS,
-            ...parsed,
-          });
+          setSettings(normalizeGenerationSettings(parsed));
         } catch {
           setSettings(DEFAULT_GENERATION_SETTINGS);
         }
@@ -813,10 +801,12 @@ export function useImageChat() {
   }, [connectionConfig, hasLoadedBrowserPreferences, rememberProviderConfig]);
 
   const updateSettings = useCallback((nextSettings: GenerationSettings) => {
-    setSettings(nextSettings);
+    const normalizedSettings = normalizeGenerationSettings(nextSettings);
+
+    setSettings(normalizedSettings);
     setStorageValue(
       GENERATION_SETTINGS_STORAGE_KEY,
-      JSON.stringify(nextSettings)
+      JSON.stringify(normalizedSettings)
     );
   }, []);
 

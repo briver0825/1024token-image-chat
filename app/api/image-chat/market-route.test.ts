@@ -30,8 +30,8 @@ function createMarketForm(overrides: Partial<{
     "settings",
     overrides.settings ??
       JSON.stringify({
-        size: "1024x1024",
-        quality: "high",
+        aspectRatio: "1:1",
+        resolution: "1k",
         outputFormat: "png",
       })
   );
@@ -92,8 +92,8 @@ describe("/api/image-chat/market", () => {
       prompt: "霓虹雨夜中的机械猫",
       model: "gpt-image-2",
       settings: {
-        size: "1024x1024",
-        quality: "high",
+        aspectRatio: "1:1",
+        resolution: "1k",
         outputFormat: "png",
       },
       image: {

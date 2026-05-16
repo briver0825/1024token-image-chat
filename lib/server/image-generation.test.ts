@@ -13,6 +13,8 @@ import type { GenerateRequest } from "@/lib/image-chat/types";
 
 const validRequest: GenerateRequest = {
   prompt: "一只坐在霓虹雨夜里的黑猫",
+  aspectRatio: "1:1",
+  resolution: "1k",
   size: "1024x1024",
   quality: "high",
   outputFormat: "png",
@@ -28,25 +30,44 @@ describe("parseGenerateRequest", () => {
     ).toEqual(validRequest);
   });
 
-  it("accepts official 4K landscape and portrait sizes", () => {
+  it("maps aspect ratio and resolution to provider pixel sizes", () => {
     expect(
       parseGenerateRequest({
         ...validRequest,
-        size: "3840x2160",
+        aspectRatio: "16:9",
+        resolution: "4k",
       })
     ).toMatchObject({
       ...validRequest,
+      aspectRatio: "16:9",
+      resolution: "4k",
       size: "3840x2160",
     });
 
     expect(
       parseGenerateRequest({
         ...validRequest,
-        size: "2160x3840",
+        aspectRatio: "9:16",
+        resolution: "4k",
       })
     ).toMatchObject({
       ...validRequest,
+      aspectRatio: "9:16",
+      resolution: "4k",
       size: "2160x3840",
+    });
+
+    expect(
+      parseGenerateRequest({
+        ...validRequest,
+        aspectRatio: "1:1",
+        resolution: "4k",
+      })
+    ).toMatchObject({
+      ...validRequest,
+      aspectRatio: "1:1",
+      resolution: "4k",
+      size: "2880x2880",
     });
   });
 
@@ -61,18 +82,26 @@ describe("parseGenerateRequest", () => {
     expect(() =>
       parseGenerateRequest({
         ...validRequest,
-        size: "800x800",
+        aspectRatio: "2:1",
       })
-    ).toThrow("size");
+    ).toThrow("aspectRatio");
   });
 
-  it("rejects compression when output format is png", () => {
+  it("strips deprecated compression settings from new requests", () => {
+    expect(
+      parseGenerateRequest({
+        ...validRequest,
+        outputFormat: "webp",
+        outputCompression: 80,
+      })
+    ).not.toHaveProperty("outputCompression");
+
     expect(() =>
       parseGenerateRequest({
         ...validRequest,
         outputCompression: 80,
-      })
-    ).toThrow("compression");
+      } satisfies GenerateRequest)
+    ).not.toThrow();
   });
 
   it("accepts up to 16 reference images and rejects extras", () => {
@@ -107,9 +136,11 @@ describe("parseGenerateRequest", () => {
 });
 
 describe("buildProviderRequestInit", () => {
-  it("forwards 4K size to the image generations provider request", () => {
+  it("forwards mapped 4K size to the image generations provider request", () => {
     const requestInit = buildProviderRequestInit("gpt-image-2", {
       ...validRequest,
+      aspectRatio: "16:9",
+      resolution: "4k",
       size: "3840x2160",
     });
 
@@ -243,7 +274,6 @@ describe("mapProviderSuccess", () => {
         request: {
           ...validRequest,
           outputFormat: "webp",
-          outputCompression: 75,
         },
         assistantMessageId: "assistant-1",
         createdAt: "2026-04-23T12:00:00.000Z",
@@ -259,7 +289,7 @@ describe("mapProviderSuccess", () => {
       params: {
         ...validRequest,
         outputFormat: "webp",
-        outputCompression: 75,
+        size: "1024x1024",
       },
       createdAt: "2026-04-23T12:00:00.000Z",
       providerMeta: {

@@ -35,6 +35,7 @@ import {
   createMarketDraft,
   MARKET_DRAFT_STORAGE_KEY,
 } from "@/lib/image-chat/market-draft";
+import { formatGenerationSettings } from "@/lib/image-chat/generation-settings";
 import type { MarketItemResponse } from "@/lib/image-chat/types";
 import { formatTimestamp } from "@/lib/image-chat/utils";
 
@@ -51,17 +52,7 @@ type MarketListResponse = {
 };
 
 function formatSettings(item: MarketItemResponse) {
-  const settings: string[] = [
-    item.settings.size,
-    item.settings.quality,
-    item.settings.outputFormat,
-  ];
-
-  if (typeof item.settings.outputCompression === "number") {
-    settings.push(`${item.settings.outputCompression}%`);
-  }
-
-  return settings.join(" · ");
+  return formatGenerationSettings(item.settings);
 }
 
 async function parseMarketListResponse(response: Response) {
@@ -539,12 +530,6 @@ export function MarketPageClient({
                   <Badge variant="outline" className="mt-2 rounded-full">
                     {formatSettings(promptDetailItem)}
                   </Badge>
-                  {typeof promptDetailItem.settings.outputCompression ===
-                  "number" ? (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      压缩质量：{promptDetailItem.settings.outputCompression}%
-                    </p>
-                  ) : null}
                 </div>
 
                 <div className="rounded-2xl border border-border/70 bg-background/60 p-4">

@@ -1,8 +1,14 @@
 import { z } from "zod";
 
 import {
+  createProviderGenerationRequest,
+  normalizeGenerationSettings,
+} from "@/lib/image-chat/generation-settings";
+import {
+  IMAGE_ASPECT_RATIO_OPTIONS,
   IMAGE_OUTPUT_FORMAT_OPTIONS,
   IMAGE_QUALITY_OPTIONS,
+  IMAGE_RESOLUTION_OPTIONS,
   IMAGE_SIZE_OPTIONS,
   type CreateMarketItemResponse,
   type GenerationSettings,
@@ -18,8 +24,10 @@ const SUPPORTED_MARKET_IMAGE_TYPES = new Set([
 ]);
 
 const generationSettingsSchema = z.object({
-  size: z.enum(IMAGE_SIZE_OPTIONS),
-  quality: z.enum(IMAGE_QUALITY_OPTIONS),
+  aspectRatio: z.enum(IMAGE_ASPECT_RATIO_OPTIONS).optional(),
+  resolution: z.enum(IMAGE_RESOLUTION_OPTIONS).optional(),
+  size: z.enum(IMAGE_SIZE_OPTIONS).optional(),
+  quality: z.enum(IMAGE_QUALITY_OPTIONS).optional(),
   outputFormat: z.enum(IMAGE_OUTPUT_FORMAT_OPTIONS),
   outputCompression: z.number().int().min(0).max(100).optional(),
 });
@@ -103,7 +111,11 @@ function parseDimension(value: string, label: string) {
 
 function parseSettings(value: string): GenerationSettings {
   try {
-    return generationSettingsSchema.parse(JSON.parse(value));
+    const parsed = generationSettingsSchema.parse(JSON.parse(value));
+
+    createProviderGenerationRequest(parsed);
+
+    return normalizeGenerationSettings(parsed);
   } catch {
     throw new MarketRequestError(400, "invalid_request", "settings 格式无效。");
   }

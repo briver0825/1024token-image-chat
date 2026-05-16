@@ -1,9 +1,9 @@
 import type {
   GenerateErrorResponse,
-  GenerateTaskRequest,
   GenerateTaskCreateResponse,
   GenerateTaskStatusResponse,
   ImageGenerationResult,
+  ParsedGenerateTaskRequest,
   ProviderConnectionConfig,
 } from "@/lib/image-chat/types";
 import { createUuid } from "@/lib/shared/uuid";
@@ -24,7 +24,7 @@ type InternalTask = {
   status: "queued" | "processing" | "completed" | "failed";
   createdAt: string;
   updatedAt: string;
-  request: GenerateTaskRequest;
+  request: ParsedGenerateTaskRequest;
   providerConfig: ProviderConnectionConfig;
   result?: ImageGenerationResult;
   error?: GenerateErrorResponse["error"];
@@ -125,7 +125,7 @@ export function createImageGenerationTask({
   providerConfig,
   fetchImpl = fetch,
 }: {
-  request: GenerateTaskRequest;
+  request: ParsedGenerateTaskRequest;
   providerConfig: ProviderConnectionConfig;
   fetchImpl?: FetchLike;
 }): GenerateTaskCreateResponse {
