@@ -27,4 +27,32 @@ describe("ParamsPanel", () => {
       outputFormat: "webp",
     });
   });
+
+  it("allows selecting 4K landscape and portrait sizes", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+
+    render(
+      <ParamsPanel
+        value={DEFAULT_GENERATION_SETTINGS}
+        onChange={onChange}
+      />
+    );
+
+    await user.click(screen.getByRole("combobox", { name: "图片尺寸" }));
+    await user.click(screen.getByRole("option", { name: "3840 × 2160" }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...DEFAULT_GENERATION_SETTINGS,
+      size: "3840x2160",
+    });
+
+    await user.click(screen.getByRole("combobox", { name: "图片尺寸" }));
+    await user.click(screen.getByRole("option", { name: "2160 × 3840" }));
+
+    expect(onChange).toHaveBeenLastCalledWith({
+      ...DEFAULT_GENERATION_SETTINGS,
+      size: "2160x3840",
+    });
+  });
 });
