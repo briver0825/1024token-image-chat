@@ -77,6 +77,8 @@ export function ParamsPanel({ value, onChange }: ParamsPanelProps) {
                 <SelectItem value="1536x1024">1536 × 1024</SelectItem>
                 <SelectItem value="1024x1536">1024 × 1536</SelectItem>
                 <SelectItem value="2048x2048">2048 × 2048</SelectItem>
+                <SelectItem value="3840x2160">3840 × 2160</SelectItem>
+                <SelectItem value="2160x3840">2160 × 3840</SelectItem>
               </SelectContent>
             </Select>
           </div>

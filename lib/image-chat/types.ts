@@ -3,6 +3,8 @@ export const IMAGE_SIZE_OPTIONS = [
   "1536x1024",
   "1024x1536",
   "2048x2048",
+  "3840x2160",
+  "2160x3840",
 ] as const;
 
 export const IMAGE_QUALITY_OPTIONS = [
